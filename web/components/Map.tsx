@@ -20,6 +20,33 @@ import poligonosReales from "@/data/colonias_zmg_poligonos.json";
 
 // ─── Cargar reportes desde Supabase (con fallback a localStorage) ────────
 const STORAGE_KEY = "mapa-agua-zmg-reportes";
+const THROTTLE_KEY = "mapa-agua-zmg-throttle";
+const THROTTLE_MINUTES = 15;
+
+function checkThrottle(colonia: string): { allowed: boolean; waitMinutes: number } {
+  if (typeof window === "undefined") return { allowed: true, waitMinutes: 0 };
+  try {
+    const data = JSON.parse(localStorage.getItem(THROTTLE_KEY) || "{}");
+    const key = colonia.toLowerCase().trim();
+    const lastReport = data[key];
+    if (lastReport) {
+      const elapsed = (Date.now() - lastReport) / 60000;
+      if (elapsed < THROTTLE_MINUTES) {
+        return { allowed: false, waitMinutes: Math.ceil(THROTTLE_MINUTES - elapsed) };
+      }
+    }
+    return { allowed: true, waitMinutes: 0 };
+  } catch { return { allowed: true, waitMinutes: 0 }; }
+}
+
+function setThrottle(colonia: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const data = JSON.parse(localStorage.getItem(THROTTLE_KEY) || "{}");
+    data[colonia.toLowerCase().trim()] = Date.now();
+    localStorage.setItem(THROTTLE_KEY, JSON.stringify(data));
+  } catch { /* ok */ }
+}
 
 async function fetchReportes(): Promise<Reporte[]> {
   // Intentar Supabase
@@ -263,12 +290,28 @@ export function Map() {
   }, [coloniasAgrupadas, mapReady]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
+  const [throttleMsg, setThrottleMsg] = useState("");
+
   const handleOpenForm = useCallback((colonia?: string) => {
+    if (colonia) {
+      const t = checkThrottle(colonia);
+      if (!t.allowed) {
+        setThrottleMsg(`Ya reportaste ${colonia}. Espera ${t.waitMinutes} min para volver a reportar esta colonia.`);
+        setTimeout(() => setThrottleMsg(""), 4000);
+        return;
+      }
+    }
     setColoniaParaReporte(colonia ?? "");
     setFormAbierto(true);
   }, []);
 
   const handleSubmit = useCallback(async (data: { colonia: string; municipio: string; categorias: CategoriaAgua[]; descripcion: string }) => {
+    // Rate limiting: 1 reporte por colonia cada 15 min
+    const throttle = checkThrottle(data.colonia);
+    if (!throttle.allowed) {
+      return; // bloqueado silenciosamente (el form muestra mensaje)
+    }
+
     const payload = {
       colonia: data.colonia,
       municipio: data.municipio,
@@ -284,6 +327,7 @@ export function Map() {
     // Guardar en Supabase
     try {
       await supabase.from("reportes").insert(payload);
+      setThrottle(data.colonia);
     } catch { /* si falla Supabase, guardar local */ }
 
     // Tambien guardar en localStorage como respaldo
@@ -348,7 +392,12 @@ export function Map() {
       <MapLegend />
       <CoprisjalPanel />
 
-      <div className="absolute bottom-6 right-6 z-10 md:bottom-8 md:right-8">
+      <div className="absolute bottom-6 right-6 z-10 md:bottom-8 md:right-8 flex flex-col items-end gap-2">
+        {throttleMsg && (
+          <div className="bg-destructive/90 text-destructive-foreground text-xs px-3 py-1.5 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2">
+            {throttleMsg}
+          </div>
+        )}
         <Button size="lg" onClick={() => handleOpenForm()} className="shadow-lg shadow-primary/25 gap-2">
           <Plus className="h-5 w-5" />
           <span className="hidden sm:inline">Reportar un problema</span>
