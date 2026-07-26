@@ -2,8 +2,8 @@
 import json, os, requests
 from pathlib import Path
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "REDACTED_SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "REDACTED_ANON_KEY")
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
 REPORTES_PATH = Path("data/reportes_semilla.json")
 ENDPOINT = f"{SUPABASE_URL}/rest/v1/reportes"
