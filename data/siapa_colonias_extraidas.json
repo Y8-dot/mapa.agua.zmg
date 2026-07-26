@@ -1,0 +1,233 @@
+[
+  {
+    "colonia": "Arcos",
+    "municipio": "Guadalajara",
+    "year": "2023",
+    "line": "5611 COL. ARCOS DEG",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Arcos de Zapopan",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "763 COL. ARCOS",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Balcones de Oblatos",
+    "municipio": "Guadalajara",
+    "year": "2024",
+    "line": "COL BALCONES DE",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Bugambilias Country",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "2263 COL. BUGAM",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Carlos Rivera Aceves",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "COL. CARLOS RIVERA",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Chapalita Oriente",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "COL. CHAPALITA",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Colinas de Tabachines",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "208 COL. COLINAS",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Cuauhtémoc",
+    "municipio": "Guadalajara",
+    "year": "2024",
+    "line": "3134 COL. CUAUH",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Del Fresno",
+    "municipio": "Zapopan",
+    "year": "2024",
+    "line": "22.01.2024 OLIVO 1301 COL. FRESNO",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Gustavo Diaz Ordaz",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "COL. GUSTAVO DI",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Hacienda de Las Lomas",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "IRIS 400 COL. HACIE",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Jardines de Guadalupe",
+    "municipio": "Zapopan",
+    "year": "2024",
+    "line": "22.02.2024 FUEGO 1078 COL. JARDINE",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Jardines de La Esperanza",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "168 COL. LA ESPER",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Juan Manuel Vallarta",
+    "municipio": "Zapopan",
+    "year": "2024",
+    "line": "22.04.2024 COL. VALLARTA",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Lomas de San Eugenio",
+    "municipio": "Guadalajara",
+    "year": "2023",
+    "line": "SALUD COL.  LOMAS DE",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Los Puestos",
+    "municipio": "Tlaquepaque",
+    "year": "2023",
+    "line": "COL. LOS PUESTOS",
+    "match": "exacto"
+  },
+  {
+    "colonia": "Margarita Maza de Juárez",
+    "municipio": "Guadalajara",
+    "year": "2023",
+    "line": "2981 COL. MARGA",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Mirador",
+    "municipio": "Guadalajara",
+    "year": "2023",
+    "line": "COL. MIRADOR D",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Miraflores",
+    "municipio": "Tlaquepaque",
+    "year": "2024",
+    "line": "28.08.2024 COL MIRAFLORES",
+    "match": "exacto"
+  },
+  {
+    "colonia": "Miramar",
+    "municipio": "Zapopan",
+    "year": "2024",
+    "line": "138 COL. MIRAMAR",
+    "match": "exacto"
+  },
+  {
+    "colonia": "Parques de San Pedro",
+    "municipio": "Guadalajara",
+    "year": "2023",
+    "line": "#4285 COL. PARQUE",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Prados Tepeyac",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "COL. PRADOS TE",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Prados del Nilo",
+    "municipio": "Tlaquepaque",
+    "year": "2023",
+    "line": "4850 COL. PRADO",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Residencial Chapalita",
+    "municipio": "Guadalajara",
+    "year": "2023",
+    "line": "2198 COL. RESIDEN",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Rinconada de Los Nogales",
+    "municipio": "Tlajomulco",
+    "year": "2023",
+    "line": "COL. RINCONADA DE",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Rinconadas del Aire",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "6271 COL. RINCONAD",
+    "match": "parcial"
+  },
+  {
+    "colonia": "San Carlos",
+    "municipio": "Guadalajara",
+    "year": "2023",
+    "line": "# 2798 COL. CARLOS",
+    "match": "parcial"
+  },
+  {
+    "colonia": "San Vicente",
+    "municipio": "Tlajomulco",
+    "year": "2023",
+    "line": "2274 COL. SAN VIC",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Tepeyac",
+    "municipio": "Tlaquepaque",
+    "year": "2023",
+    "line": "1117 COL. TEPEYAC",
+    "match": "exacto"
+  },
+  {
+    "colonia": "Villa Puerta del Sol",
+    "municipio": "Zapopan",
+    "year": "2023",
+    "line": "5344 COL. VILLA P",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Villas Alcalde",
+    "municipio": "Zapopan",
+    "year": "2024",
+    "line": "24.01.2024 LICEO 954 COL. ALCALDE",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Villas de San Javier",
+    "municipio": "Zapopan",
+    "year": "2024",
+    "line": "30.12.2024 COL VILLAS",
+    "match": "parcial"
+  },
+  {
+    "colonia": "Villas del Tepeyac",
+    "municipio": "Zapopan",
+    "year": "2024",
+    "line": "COL VILLAS DEL",
+    "match": "parcial"
+  }
+]

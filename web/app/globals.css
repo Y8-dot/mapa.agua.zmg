@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 5%;
+    --foreground: 210 20% 98%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 200 90% 55%;
+    --primary-foreground: 222 47% 10%;
+
+    --secondary: 215 25% 18%;
+    --secondary-foreground: 210 20% 98%;
+
+    --muted: 215 25% 18%;
+    --muted-foreground: 215 16% 65%;
+
+    --accent: 215 25% 22%;
+    --accent-foreground: 210 20% 98%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 210 20% 98%;
+
+    --border: 215 25% 22%;
+    --input: 215 25% 22%;
+    --ring: 200 90% 55%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* MapLibre overrides para tema oscuro */
+.maplibregl-ctrl-attrib {
+  display: none !important;
+}
+.maplibregl-popup-content {
+  background: rgba(2, 6, 23, 0.92) !important;
+  color: rgb(226, 232, 240) !important;
+  border: 1px solid rgba(148, 163, 184, 0.15) !important;
+  border-radius: 0.5rem !important;
+  padding: 0.75rem !important;
+  font-family: inherit !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.5 !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+}
+.maplibregl-popup-tip {
+  border-top-color: rgba(2, 6, 23, 0.92) !important;
+}
+.maplibregl-ctrl-group {
+  background: rgba(15, 23, 42, 0.92) !important;
+  border: 1px solid rgba(148, 163, 184, 0.15) !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden;
+}
+.maplibregl-ctrl-group button {
+  filter: invert(0.9) !important;
+}
+.maplibregl-ctrl-group button:hover {
+  background: rgba(148, 163, 184, 0.1) !important;
+}

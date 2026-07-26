@@ -1,0 +1,50 @@
+{
+  "Zapopan": {
+    "total_pruebas": 100,
+    "periodo": "10 de febrero de 2026 – 9 de julio de 2024",
+    "fuera_norma": {
+      "cloro_residual_pct": 77,
+      "ion_fluoruro_pct": 18,
+      "color_pct": 4
+    },
+    "fuente": "COPRISJAL (datos obtenidos por Jonathan Lomeli, El Informador)",
+    "fuente_url": "https://drive.google.com/drive/folders/1BNQH242dMRr0bMRZnBJjFrIRcUNlGjfq",
+    "nota": "211 pruebas fisico-quimicas realizadas por COPRISJAL. Datos obtenidos via periodista Jonathan Lomeli (El Informador). No incluyen desglose por colonia."
+  },
+  "Tonalá": {
+    "total_pruebas": 53,
+    "periodo": "10 de julio de 2025 – 9 de octubre de 2025",
+    "fuera_norma": {
+      "cloro_residual_pct": 70,
+      "ion_fluoruro_pct": 6,
+      "color_pct": 19
+    },
+    "fuente": "COPRISJAL (datos obtenidos por Jonathan Lomeli, El Informador)",
+    "fuente_url": "https://drive.google.com/drive/folders/1BNQH242dMRr0bMRZnBJjFrIRcUNlGjfq",
+    "nota": "211 pruebas fisico-quimicas realizadas por COPRISJAL. Datos obtenidos via periodista Jonathan Lomeli (El Informador). No incluyen desglose por colonia."
+  },
+  "Guadalajara": {
+    "total_pruebas": 40,
+    "periodo": "10 de febrero de 2025 – 9 de septiembre de 2024",
+    "fuera_norma": {
+      "cloro_residual_pct": 57,
+      "ion_fluoruro_pct": 22,
+      "color_pct": 0
+    },
+    "fuente": "COPRISJAL (datos obtenidos por Jonathan Lomeli, El Informador)",
+    "fuente_url": "https://drive.google.com/drive/folders/1BNQH242dMRr0bMRZnBJjFrIRcUNlGjfq",
+    "nota": "211 pruebas fisico-quimicas realizadas por COPRISJAL. Datos obtenidos via periodista Jonathan Lomeli (El Informador). No incluyen desglose por colonia."
+  },
+  "Tlaquepaque": {
+    "total_pruebas": 18,
+    "periodo": "1 de diciembre de 2025 – 7 de mayo de 2024",
+    "fuera_norma": {
+      "cloro_residual_pct": 67,
+      "ion_fluoruro_pct": 22,
+      "color_pct": 0
+    },
+    "fuente": "COPRISJAL (datos obtenidos por Jonathan Lomeli, El Informador)",
+    "fuente_url": "https://drive.google.com/drive/folders/1BNQH242dMRr0bMRZnBJjFrIRcUNlGjfq",
+    "nota": "211 pruebas fisico-quimicas realizadas por COPRISJAL. Datos obtenidos via periodista Jonathan Lomeli (El Informador). No incluyen desglose por colonia."
+  }
+}
