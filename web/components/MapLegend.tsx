@@ -4,7 +4,7 @@ export function MapLegend() {
       <div className="text-xs font-semibold text-muted-foreground mb-1.5">
         Reportes por colonia
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-1.5">
           <span
             className="inline-block h-4 w-4 rounded-sm border"

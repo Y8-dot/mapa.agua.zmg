@@ -18,16 +18,9 @@ interface ColoniaDetailProps {
   onReportar: (nombre: string) => void;
 }
 
-export function ColoniaDetail({
-  open,
-  onClose,
-  colonia,
-  onReportar,
-}: ColoniaDetailProps) {
-  if (!open || !colonia) return null;
-
+function ColoniaDetailContent({ colonia, onClose, onReportar }: Omit<ColoniaDetailProps, "open"> & { colonia: NonNullable<ColoniaDetailProps["colonia"]> }) {
   return (
-    <div className="absolute top-4 right-4 z-10 w-[360px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-lg border bg-card/95 backdrop-blur shadow-xl animate-slide-up">
+    <>
       {/* Header */}
       <div className="flex items-start justify-between p-4 pb-2">
         <div>
@@ -135,6 +128,36 @@ export function ColoniaDetail({
           Reportar problema en {colonia.nombre}
         </Button>
       </div>
-    </div>
+    </>
+  );
+}
+
+export function ColoniaDetail({
+  open,
+  onClose,
+  colonia,
+  onReportar,
+}: ColoniaDetailProps) {
+  if (!open || !colonia) return null;
+
+  return (
+    <>
+      {/* ── Desktop: floating panel (md+) ── */}
+      <div className="hidden md:block absolute top-4 right-4 z-10 w-[360px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-lg border bg-card/95 backdrop-blur shadow-xl animate-slide-up">
+        <ColoniaDetailContent colonia={colonia} onClose={onClose} onReportar={onReportar} />
+      </div>
+
+      {/* ── Mobile: bottom sheet ── */}
+      <div className="md:hidden fixed inset-0 z-50 animate-fade-in">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className="absolute bottom-0 left-0 right-0 max-h-[75vh] overflow-y-auto rounded-t-xl bg-card shadow-2xl animate-slide-up">
+          {/* drag handle */}
+          <div className="sticky top-0 z-10 bg-card rounded-t-xl pt-3 pb-1 flex justify-center">
+            <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+          </div>
+          <ColoniaDetailContent colonia={colonia} onClose={onClose} onReportar={onReportar} />
+        </div>
+      </div>
+    </>
   );
 }

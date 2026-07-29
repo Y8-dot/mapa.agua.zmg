@@ -3,15 +3,15 @@ import Link from "next/link";
 export function Attribution() {
   return (
     <footer className="absolute bottom-0 left-0 right-0 z-10 bg-background/80 backdrop-blur border-t border-border/50 px-3 py-1.5">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-foreground/80">Mapa Ciudadano de Calidad del Agua — ZMG</span>
-          <span className="hidden sm:inline">·</span>
-          <span className="hidden sm:inline">
-            Datos: IMDEC, ITESO, CEDHJ, COPRISJAL, SIAPA, Milenio, El Informador, Proceso, LABCSA, UDGTV
+      <div className="flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground gap-1">
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0">
+          <span className="font-medium text-foreground/80 truncate">Mapa Agua ZMG</span>
+          <span className="hidden sm:inline text-muted-foreground/50">·</span>
+          <span className="hidden sm:inline truncate">
+            Datos: IMDEC, ITESO, CEDHJ, COPRISJAL, SIAPA, prensa
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <Link href="/acerca" className="hover:text-foreground transition-colors">Acerca</Link>
           <Link href="/metodologia" className="hover:text-foreground transition-colors">Metodologia</Link>
           <a href="https://github.com/Y8-dot/mapa.agua.zmg" target="_blank" rel="noopener noreferrer"

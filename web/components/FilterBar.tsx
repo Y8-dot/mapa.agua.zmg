@@ -69,7 +69,7 @@ export function FilterBar({ filtros, onChange }: FilterBarProps) {
   const totalFiltros = filtros.categorias.length + filtros.fuentes.length;
 
   return (
-    <div className="absolute top-4 left-4 z-10 max-w-[340px]">
+    <div className="absolute top-14 left-4 z-10 max-w-[340px] md:top-4">
       {/* Botón principal */}
       <button
         onClick={() => setExpandido(!expandido)}

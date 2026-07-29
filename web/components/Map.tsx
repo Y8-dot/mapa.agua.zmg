@@ -381,11 +381,13 @@ export function Map() {
   }, [coloniasAgrupadas]);
 
   return (
-    <div className="relative h-screen w-full overflow-hidden">
+    <div className="relative h-dvh w-full overflow-hidden">
       <div ref={mapContainer} className="h-full w-full" />
 
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-[340px] max-w-[calc(100vw-8rem)]">
-        <SearchBar colonias={listaColonias} onSelect={handleSearchSelect} />
+      <div className="absolute top-4 left-4 right-4 z-20 flex flex-col items-center gap-2 md:flex-row md:justify-center md:left-1/2 md:-translate-x-1/2 md:right-auto">
+        <div className="w-full md:w-[340px]">
+          <SearchBar colonias={listaColonias} onSelect={handleSearchSelect} />
+        </div>
       </div>
 
       <FilterBar filtros={filtros} onChange={setFiltros} />

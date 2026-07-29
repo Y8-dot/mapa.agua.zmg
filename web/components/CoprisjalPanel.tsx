@@ -19,7 +19,7 @@ export function CoprisjalPanel() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="absolute bottom-24 left-4 z-10">
+    <div className="absolute bottom-32 left-4 z-10 md:bottom-24">
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 rounded-lg border bg-card/90 backdrop-blur px-3 py-2 text-xs font-medium shadow-lg hover:bg-accent transition-colors"
