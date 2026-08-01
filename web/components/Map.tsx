@@ -160,7 +160,7 @@ export function Map() {
       zoom: ZMG_ZOOM,
       attributionControl: false,
     });
-    map.addControl(new maplibregl.NavigationControl(), "bottom-right");
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
 
     map.on("load", () => {
       map.addSource("colonias-reales", {
@@ -394,7 +394,7 @@ export function Map() {
       <MapLegend />
       <CoprisjalPanel />
 
-      <div className="absolute bottom-6 right-6 z-10 md:bottom-8 md:right-8 flex flex-col items-end gap-2">
+      <div className="absolute bottom-10 right-4 z-10 md:bottom-8 md:right-8 flex flex-col items-end gap-2">
         {throttleMsg && (
           <div className="bg-destructive/90 text-destructive-foreground text-xs px-3 py-1.5 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2">
             {throttleMsg}

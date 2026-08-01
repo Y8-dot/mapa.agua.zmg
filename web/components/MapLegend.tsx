@@ -1,6 +1,6 @@
 export function MapLegend() {
   return (
-    <div className="absolute bottom-6 left-4 z-10 rounded-lg border bg-card/90 backdrop-blur px-3 py-2 shadow-lg">
+    <div className="absolute bottom-10 left-4 z-10 rounded-lg border bg-card/90 backdrop-blur px-3 py-2 shadow-lg md:bottom-6">
       <div className="text-xs font-semibold text-muted-foreground mb-1.5">
         Reportes por colonia
       </div>
