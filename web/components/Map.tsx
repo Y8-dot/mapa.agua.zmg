@@ -12,7 +12,7 @@ import { CoprisjalPanel } from "./CoprisjalPanel";
 import { Attribution } from "./Attribution";
 import { SearchBar } from "./SearchBar";
 import { Button } from "./ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Minus } from "lucide-react";
 import type { Reporte, CategoriaAgua, FuenteTipo } from "@/lib/tipos";
 import { supabase } from "@/lib/supabase";
 
@@ -160,8 +160,6 @@ export function Map() {
       zoom: ZMG_ZOOM,
       attributionControl: false,
     });
-    map.addControl(new maplibregl.NavigationControl(), "top-right");
-
     map.on("load", () => {
       map.addSource("colonias-reales", {
         type: "geojson",
@@ -394,12 +392,31 @@ export function Map() {
       <MapLegend />
       <CoprisjalPanel />
 
-      <div className="absolute bottom-10 right-4 z-10 md:bottom-8 md:right-8 flex flex-col items-end gap-2">
+      {/* ── Zoom + Reportar (stacked bottom-right) ── */}
+      <div className="absolute bottom-10 right-4 z-10 flex flex-col items-end gap-2 md:bottom-8 md:right-4">
         {throttleMsg && (
           <div className="bg-destructive/90 text-destructive-foreground text-xs px-3 py-1.5 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2">
             {throttleMsg}
           </div>
         )}
+        {/* Custom zoom controls */}
+        <div className="flex flex-col rounded-lg border bg-card/95 backdrop-blur shadow-lg overflow-hidden">
+          <button
+            onClick={() => mapRef.current?.zoomIn()}
+            className="p-2 hover:bg-accent transition-colors"
+            aria-label="Acercar"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <div className="border-t border-border" />
+          <button
+            onClick={() => mapRef.current?.zoomOut()}
+            className="p-2 hover:bg-accent transition-colors"
+            aria-label="Alejar"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+        </div>
         <Button size="lg" onClick={() => handleOpenForm()} className="shadow-lg shadow-primary/25 gap-2">
           <Plus className="h-5 w-5" />
           <span className="hidden sm:inline">Reportar un problema</span>
