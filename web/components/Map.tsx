@@ -49,34 +49,49 @@ function setThrottle(colonia: string) {
 }
 
 async function fetchReportes(): Promise<Reporte[]> {
-  // Intentar Supabase
+  // Intentar Supabase (paginando, PostgREST limita a 1000 filas por request)
   try {
-    const { data, error } = await supabase
-      .from("reportes")
-      .select("*")
-      .eq("estado_moderacion", "aprobado")
-      .order("created_at", { ascending: false });
+    const PAGE_SIZE = 1000;
+    const remotos: Reporte[] = [];
+    let from = 0;
+    let to = PAGE_SIZE - 1;
 
-    if (!error && data) {
-      const remotos: Reporte[] = data.map((r: Record<string, unknown>) => ({
-        id: String(r.id),
-        colonia: r.colonia as string,
-        municipio: r.municipio as Reporte["municipio"],
-        categorias: (r.categorias as CategoriaAgua[]) || [],
-        fuente_tipo: r.fuente_tipo as FuenteTipo,
-        fuente_nombre: r.fuente_nombre as string,
-        fuente_url: r.fuente_url as string | undefined,
-        descripcion: r.descripcion as string,
-        fecha_reporte: r.fecha_reporte as string,
-        fecha_carga: (r.fecha_carga as string) || "",
-        nivel_confianza: r.nivel_confianza as Reporte["nivel_confianza"],
-        estado_moderacion: "aprobado",
-      }));
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data, error } = await supabase
+        .from("reportes")
+        .select("*")
+        .eq("estado_moderacion", "aprobado")
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-      // Tambien cargar locales
-      const locales = cargarLocales();
-      return [...remotos, ...locales];
+      if (error || !data || data.length === 0) break;
+
+      remotos.push(
+        ...data.map((r: Record<string, unknown>) => ({
+          id: String(r.id),
+          colonia: r.colonia as string,
+          municipio: r.municipio as Reporte["municipio"],
+          categorias: (r.categorias as CategoriaAgua[]) || [],
+          fuente_tipo: r.fuente_tipo as FuenteTipo,
+          fuente_nombre: r.fuente_nombre as string,
+          fuente_url: r.fuente_url as string | undefined,
+          descripcion: r.descripcion as string,
+          fecha_reporte: r.fecha_reporte as string,
+          fecha_carga: (r.fecha_carga as string) || "",
+          nivel_confianza: r.nivel_confianza as Reporte["nivel_confianza"],
+          estado_moderacion: "aprobado" as const,
+        }))
+      );
+
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+      to += PAGE_SIZE;
     }
+
+    // Tambien cargar locales
+    const locales = cargarLocales();
+    return [...remotos, ...locales];
   } catch { /* fallback */ }
 
   return cargarLocales();
@@ -102,10 +117,18 @@ interface GrupoColonia {
   categorias: Set<CategoriaAgua>;
 }
 
+function normalizarKey(colonia: string, municipio: string): string {
+  return `${colonia}|${municipio}`
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 function agruparReportes(reportes: Reporte[]): globalThis.Map<string, GrupoColonia> {
   const grupos = new globalThis.Map<string, GrupoColonia>();
   for (const r of reportes) {
-    const key = `${r.colonia}|${r.municipio}`;
+    const key = normalizarKey(r.colonia, r.municipio);
     const g = grupos.get(key);
     if (g) {
       g.reportes.push(r);
@@ -256,7 +279,7 @@ export function Map() {
       if (feats.length === 0) return;
       const p = feats[0].properties;
       if (!p) return;
-      const key = `${p.nombre}|${p.municipio}`;
+      const key = normalizarKey(p.nombre, p.municipio);
       const grupo = agrupadasRef.current.get(key);
       if (!grupo) return;
       setColoniaSel({ nombre: p.nombre, municipio: p.municipio, reportes: grupo.reportes, categorias: Array.from(grupo.categorias) });
@@ -279,7 +302,7 @@ export function Map() {
       sourcePol.setData({
         type: "FeatureCollection",
         features: (poligonosReales as GeoJSON.FeatureCollection).features.map((f) => {
-          const key = `${f.properties?.nombre}|${f.properties?.municipio}`;
+          const key = normalizarKey(f.properties?.nombre ?? "", f.properties?.municipio ?? "");
           const grupo = coloniasAgrupadas.get(key);
           return { ...f, properties: { ...f.properties, count: grupo?.count ?? 0 } };
         }),
@@ -347,7 +370,7 @@ export function Map() {
 
   const handleSearchSelect = useCallback((nombre: string, municipio: string) => {
     if (!mapRef.current) return;
-    const key = `${nombre}|${municipio}`;
+    const key = normalizarKey(nombre, municipio);
     const grupo = coloniasAgrupadas.get(key);
     const feats = (poligonosReales as GeoJSON.FeatureCollection).features.filter(
       (f) => f.properties?.nombre === nombre && f.properties?.municipio === municipio
@@ -369,7 +392,7 @@ export function Map() {
       const n = f.properties?.nombre;
       const m = f.properties?.municipio;
       if (!n || !m) continue;
-      const k = `${n}|${m}`;
+      const k = normalizarKey(n, m);
       if (seen.has(k)) continue;
       seen.add(k);
       const g = coloniasAgrupadas.get(k);
