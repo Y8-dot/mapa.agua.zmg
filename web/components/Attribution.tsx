@@ -10,6 +10,13 @@ export function Attribution() {
           <span className="hidden sm:inline truncate">
             Datos: IMDEC, ITESO, CEDHJ, COPRISJAL, SIAPA, prensa
           </span>
+          <span className="hidden sm:inline text-muted-foreground/50">·</span>
+          <span className="truncate">
+            Mapa ©{" "}
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">OpenStreetMap</a>
+            {" "}©{" "}
+            <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">CARTO</a>
+          </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <Link href="/acerca" className="hover:text-foreground transition-colors">Acerca</Link>

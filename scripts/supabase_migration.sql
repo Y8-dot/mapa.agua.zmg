@@ -1,3 +1,7 @@
+-- NOTA: el PASO 2 de este archivo quedó reemplazado por
+-- supabase_migration_002_limite_ip.sql (RLS estricto + límite por IP).
+-- Los reportes ciudadanos ya no se insertan desde el navegador.
+
 -- =====================================================
 -- PASO 1: Ejecutar ESTO PRIMERO en Supabase SQL Editor
 -- https://TU_PROYECTO.supabase.co → SQL Editor

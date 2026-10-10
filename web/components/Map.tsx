@@ -4,107 +4,78 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, { Map as MlMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { FilterBar, type FiltrosActivos } from "./FilterBar";
-import { ColoniaDetail } from "./ColoniaDetail";
-import { ReportForm } from "./ReportForm";
+import { ColoniaDetail, type NivelColonia } from "./ColoniaDetail";
+import { ReportForm, type ResultadoEnvio, type DatosReporte } from "./ReportForm";
 import { LegalDisclaimer } from "./LegalDisclaimer";
 import { MapLegend } from "./MapLegend";
 import { CoprisjalPanel } from "./CoprisjalPanel";
 import { Attribution } from "./Attribution";
 import { SearchBar } from "./SearchBar";
+import { TopColonias, type ItemTop } from "./TopColonias";
 import { Button } from "./ui/button";
 import { Plus, Minus } from "lucide-react";
-import type { Reporte, CategoriaAgua, FuenteTipo } from "@/lib/tipos";
+import { normalizarKey, type Reporte, type CategoriaAgua, type FuenteTipo } from "@/lib/tipos";
+import {
+  calcularCortes,
+  claseDePuntaje,
+  puntajeColonia,
+  rangosPorClase,
+  ETIQUETAS_CLASE,
+  OPACIDAD_SEVERIDAD,
+  RAMPA_SEVERIDAD,
+} from "@/lib/severidad";
 import { supabase } from "@/lib/supabase";
 
 import poligonosReales from "@/data/colonias_zmg_poligonos.json";
 
-// ─── Cargar reportes desde Supabase (con fallback a localStorage) ────────
-const STORAGE_KEY = "mapa-agua-zmg-reportes";
-const THROTTLE_KEY = "mapa-agua-zmg-throttle";
-const THROTTLE_MINUTES = 15;
+const POLIGONOS = poligonosReales as GeoJSON.FeatureCollection;
 
-function checkThrottle(colonia: string): { allowed: boolean; waitMinutes: number } {
-  if (typeof window === "undefined") return { allowed: true, waitMinutes: 0 };
-  try {
-    const data = JSON.parse(localStorage.getItem(THROTTLE_KEY) || "{}");
-    const key = colonia.toLowerCase().trim();
-    const lastReport = data[key];
-    if (lastReport) {
-      const elapsed = (Date.now() - lastReport) / 60000;
-      if (elapsed < THROTTLE_MINUTES) {
-        return { allowed: false, waitMinutes: Math.ceil(THROTTLE_MINUTES - elapsed) };
-      }
-    }
-    return { allowed: true, waitMinutes: 0 };
-  } catch { return { allowed: true, waitMinutes: 0 }; }
-}
+const COLUMNAS =
+  "id,colonia,municipio,categorias,fuente_tipo,fuente_nombre,fuente_url,descripcion,fecha_reporte,fecha_carga,nivel_confianza,created_at";
 
-function setThrottle(colonia: string) {
-  if (typeof window === "undefined") return;
-  try {
-    const data = JSON.parse(localStorage.getItem(THROTTLE_KEY) || "{}");
-    data[colonia.toLowerCase().trim()] = Date.now();
-    localStorage.setItem(THROTTLE_KEY, JSON.stringify(data));
-  } catch { /* ok */ }
-}
-
+// ─── Cargar reportes aprobados desde Supabase ────────────────────────────
 async function fetchReportes(): Promise<Reporte[]> {
-  // Intentar Supabase (paginando, PostgREST limita a 1000 filas por request)
-  try {
-    const PAGE_SIZE = 1000;
-    const remotos: Reporte[] = [];
-    let from = 0;
-    let to = PAGE_SIZE - 1;
+  // PostgREST limita a 1000 filas por request: paginar.
+  const PAGE_SIZE = 1000;
+  const remotos: Reporte[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("reportes")
+      .select(COLUMNAS)
+      .eq("estado_moderacion", "aprobado")
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
 
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { data, error } = await supabase
-        .from("reportes")
-        .select("*")
-        .eq("estado_moderacion", "aprobado")
-        .order("created_at", { ascending: false })
-        .range(from, to);
-
-      if (error || !data || data.length === 0) break;
-
-      remotos.push(
-        ...data.map((r: Record<string, unknown>) => ({
-          id: String(r.id),
-          colonia: r.colonia as string,
-          municipio: r.municipio as Reporte["municipio"],
-          categorias: (r.categorias as CategoriaAgua[]) || [],
-          fuente_tipo: r.fuente_tipo as FuenteTipo,
-          fuente_nombre: r.fuente_nombre as string,
-          fuente_url: r.fuente_url as string | undefined,
-          descripcion: r.descripcion as string,
-          fecha_reporte: r.fecha_reporte as string,
-          fecha_carga: (r.fecha_carga as string) || "",
-          nivel_confianza: r.nivel_confianza as Reporte["nivel_confianza"],
-          estado_moderacion: "aprobado" as const,
-        }))
-      );
-
-      if (data.length < PAGE_SIZE) break;
-      from += PAGE_SIZE;
-      to += PAGE_SIZE;
+    if (error) {
+      console.error("[mapa] Error cargando reportes:", error.message);
+      break;
     }
+    if (!data || data.length === 0) break;
 
-    // Tambien cargar locales
-    const locales = cargarLocales();
-    return [...remotos, ...locales];
-  } catch { /* fallback */ }
-
-  return cargarLocales();
+    for (const r of data as Record<string, unknown>[]) {
+      remotos.push({
+        id: String(r.id),
+        colonia: r.colonia as string,
+        municipio: r.municipio as Reporte["municipio"],
+        categorias: (r.categorias as CategoriaAgua[]) || [],
+        fuente_tipo: r.fuente_tipo as FuenteTipo,
+        fuente_nombre: r.fuente_nombre as string,
+        fuente_url: (r.fuente_url as string) || undefined,
+        descripcion: (r.descripcion as string) || "",
+        fecha_reporte: r.fecha_reporte as string,
+        fecha_carga: (r.fecha_carga as string) || "",
+        nivel_confianza: r.nivel_confianza as Reporte["nivel_confianza"],
+        created_at: r.created_at as string | undefined,
+        estado_moderacion: "aprobado",
+      });
+    }
+    if (data.length < PAGE_SIZE) break;
+  }
+  return remotos;
 }
 
-function cargarLocales(): Reporte[] {
-  if (typeof window !== "undefined") {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  }
-  return [];
+function esEscritorio(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
 }
 
 const ZMG_CENTER: [number, number] = [-103.35, 20.67];
@@ -115,14 +86,8 @@ interface GrupoColonia {
   reportes: Reporte[];
   count: number;
   categorias: Set<CategoriaAgua>;
-}
-
-function normalizarKey(colonia: string, municipio: string): string {
-  return `${colonia}|${municipio}`
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  puntaje: number;
+  clase: number;
 }
 
 function agruparReportes(reportes: Reporte[]): globalThis.Map<string, GrupoColonia> {
@@ -135,26 +100,68 @@ function agruparReportes(reportes: Reporte[]): globalThis.Map<string, GrupoColon
       g.count++;
       r.categorias.forEach((c) => g.categorias.add(c));
     } else {
-      grupos.set(key, { reportes: [r], count: 1, categorias: new Set(r.categorias) });
+      grupos.set(key, { reportes: [r], count: 1, categorias: new Set(r.categorias), puntaje: 0, clase: -1 });
     }
   }
   return grupos;
 }
+
+/** Expresión MapLibre: valor según la clase (−1 = sin reportes). */
+function porClase(valores: readonly (string | number)[], defecto: string | number): maplibregl.ExpressionSpecification {
+  const expr: unknown[] = ["match", ["get", "clase"]];
+  valores.forEach((v, i) => expr.push(i, v));
+  expr.push(defecto);
+  return expr as maplibregl.ExpressionSpecification;
+}
+
+function centroDeGeometria(g: GeoJSON.Geometry): [number, number] | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const visitar = (c: unknown): void => {
+    if (Array.isArray(c) && typeof c[0] === "number") {
+      const [x, y] = c as number[];
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    } else if (Array.isArray(c)) c.forEach(visitar);
+  };
+  if ("coordinates" in g) visitar(g.coordinates);
+  return Number.isFinite(minX) ? [(minX + maxX) / 2, (minY + maxY) / 2] : null;
+}
+
+type ColoniaSeleccionada = {
+  nombre: string;
+  municipio: string;
+  reportes: Reporte[];
+  categorias: CategoriaAgua[];
+  nivel?: NivelColonia;
+};
 
 export function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [reportes, setReportes] = useState<Reporte[]>([]);
-  const [coloniaSel, setColoniaSel] = useState<{
-    nombre: string; municipio: string; reportes: Reporte[]; categorias: CategoriaAgua[];
-  } | null>(null);
+  const [coloniaSel, setColoniaSel] = useState<ColoniaSeleccionada | null>(null);
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [formAbierto, setFormAbierto] = useState(false);
   const [coloniaParaReporte, setColoniaParaReporte] = useState("");
   const [filtros, setFiltros] = useState<FiltrosActivos>({ categorias: [], fuentes: [] });
+  // Paneles superiores. En escritorio el Top 5 arranca abierto; en celular ambos cerrados
+  // y abrir uno cierra el otro (comparten la misma franja de pantalla).
+  const [filtrosAbierto, setFiltrosAbierto] = useState(false);
+  const [top5Abierto, setTop5Abierto] = useState(esEscritorio);
+  const toggleFiltros = useCallback(() => {
+    const abrir = !filtrosAbierto;
+    setFiltrosAbierto(abrir);
+    if (abrir && !esEscritorio()) setTop5Abierto(false);
+  }, [filtrosAbierto]);
+  const toggleTop5 = useCallback(() => {
+    const abrir = !top5Abierto;
+    setTop5Abierto(abrir);
+    if (abrir && !esEscritorio()) setFiltrosAbierto(false);
+  }, [top5Abierto]);
 
-  // Cargar reportes desde Supabase al montar
   useEffect(() => {
     fetchReportes().then(setReportes);
   }, []);
@@ -167,13 +174,34 @@ export function Map() {
     });
   }, [reportes, filtros]);
 
-  const coloniasAgrupadas = useMemo(() => agruparReportes(reportesFiltrados), [reportesFiltrados]);
+  // Agrupar por colonia, calcular puntaje ponderado y clase (cortes naturales).
+  const { coloniasAgrupadas, rangos } = useMemo(() => {
+    const grupos = agruparReportes(reportesFiltrados);
+    const ahora = Date.now();
+    const puntajes: number[] = [];
+    grupos.forEach((g) => {
+      g.puntaje = puntajeColonia(g.reportes, ahora);
+      puntajes.push(g.puntaje);
+    });
+    const cortes = calcularCortes(puntajes);
+    grupos.forEach((g) => {
+      g.clase = claseDePuntaje(g.puntaje, cortes);
+    });
+    return { coloniasAgrupadas: grupos, rangos: rangosPorClase(puntajes, cortes) };
+  }, [reportesFiltrados]);
 
-  // Ref para evitar stale closure en el click handler
+  const nivelDe = useCallback((g: GrupoColonia): NivelColonia | undefined => {
+    if (g.clase < 0) return undefined;
+    return { etiqueta: ETIQUETAS_CLASE[g.clase], color: RAMPA_SEVERIDAD[g.clase], puntaje: g.puntaje };
+  }, []);
+
+  // Refs para evitar closures obsoletos en los handlers del mapa
   const agrupadasRef = useRef(coloniasAgrupadas);
   agrupadasRef.current = coloniasAgrupadas;
+  const nivelDeRef = useRef(nivelDe);
+  nivelDeRef.current = nivelDe;
 
-  // ─── Init mapa con polígonos Voronoi ───────────────────────────────────
+  // ─── Init mapa ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
     const map = new maplibregl.Map({
@@ -186,52 +214,40 @@ export function Map() {
     map.on("load", () => {
       map.addSource("colonias-reales", {
         type: "geojson",
-        data: poligonosReales as GeoJSON.FeatureCollection,
+        data: { type: "FeatureCollection", features: [] },
       });
 
-      // Relleno de polígonos (choropleth) — solo colonias con reportes
+      const conReportes: maplibregl.FilterSpecification = [">=", ["get", "clase"], 0];
+
       map.addLayer({
         id: "colonias-fill",
         type: "fill",
         source: "colonias-reales",
-        filter: [">", ["get", "count"], 0],
+        filter: conReportes,
         paint: {
-          "fill-color": [
-            "case",
-            ["==", ["get", "count"], 1], "#eab308",
-            ["==", ["get", "count"], 2], "#f97316",
-            [">=", ["get", "count"], 3], "#dc2626",
-            "#eab308",
-          ],
-          "fill-opacity": 0.3,
+          "fill-color": porClase(RAMPA_SEVERIDAD, RAMPA_SEVERIDAD[0]),
+          "fill-opacity": porClase(OPACIDAD_SEVERIDAD, 0.2),
         },
       });
 
-      // Borde de polígonos — solo colonias con reportes
       map.addLayer({
         id: "colonias-line",
         type: "line",
         source: "colonias-reales",
-        filter: [">", ["get", "count"], 0],
+        filter: conReportes,
         paint: {
-          "line-color": [
-            "case",
-            ["==", ["get", "count"], 1], "rgba(234,179,8,0.45)",
-            ["==", ["get", "count"], 2], "rgba(249,115,22,0.45)",
-            "rgba(220,38,38,0.50)",
-          ],
-          "line-width": 1.2,
-          "line-opacity": 0.8,
+          "line-color": porClase(RAMPA_SEVERIDAD, RAMPA_SEVERIDAD[0]),
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.4, 14, 1.2],
+          "line-opacity": 0.7,
         },
       });
 
-      // Etiquetas de nombre — solo colonias con reportes
       map.addLayer({
         id: "colonias-nombres",
         type: "symbol",
         source: "colonias-reales",
         minzoom: 12,
-        filter: [">", ["get", "count"], 0],
+        filter: conReportes,
         layout: {
           "text-field": ["get", "nombre"],
           "text-size": ["interpolate", ["linear"], ["zoom"], 12, 9, 14, 11, 16, 13],
@@ -243,19 +259,20 @@ export function Map() {
           "text-color": "#ffffff",
           "text-halo-color": "rgba(0,0,0,0.9)",
           "text-halo-width": 2.5,
-          "text-opacity": ["interpolate", ["linear"], ["zoom"], 11.5, 0, 12.5, 0.8],
+          "text-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 12.6, 0.85],
         },
       });
 
-      // Conteo — solo colonias con reportes
+      // Conteo: solo de cerca, para no saturar la vista general con números
       map.addLayer({
         id: "colonias-conteo",
         type: "symbol",
         source: "colonias-reales",
-        filter: [">", ["get", "count"], 0],
+        minzoom: 12,
+        filter: conReportes,
         layout: {
           "text-field": ["to-string", ["get", "count"]],
-          "text-size": ["interpolate", ["linear"], ["zoom"], 11, 11, 14, 15],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 12, 11, 14, 13, 16, 15],
           "text-font": ["Open Sans Bold"],
           "text-offset": [0, -2.2],
           "text-anchor": "top",
@@ -267,22 +284,22 @@ export function Map() {
         },
       });
 
-      // ── Capa de PUNTOS (respaldo para colonias sin poligono) ─────
-      // Ya no se necesita: todas las 2053 colonias tienen poligono ahora
-
       mapRef.current = map;
       setMapReady(true);
     });
 
     map.on("click", "colonias-fill", (e) => {
-      const feats = map.queryRenderedFeatures(e.point, { layers: ["colonias-fill"] });
-      if (feats.length === 0) return;
-      const p = feats[0].properties;
+      const p = e.features?.[0]?.properties;
       if (!p) return;
-      const key = normalizarKey(p.nombre, p.municipio);
-      const grupo = agrupadasRef.current.get(key);
+      const grupo = agrupadasRef.current.get(normalizarKey(p.nombre, p.municipio));
       if (!grupo) return;
-      setColoniaSel({ nombre: p.nombre, municipio: p.municipio, reportes: grupo.reportes, categorias: Array.from(grupo.categorias) });
+      setColoniaSel({
+        nombre: p.nombre,
+        municipio: p.municipio,
+        reportes: grupo.reportes,
+        categorias: Array.from(grupo.categorias),
+        nivel: nivelDeRef.current(grupo),
+      });
       setPanelAbierto(true);
     });
 
@@ -290,113 +307,106 @@ export function Map() {
     map.on("mouseleave", "colonias-fill", () => { map.getCanvas().style.cursor = ""; });
 
     return () => { map.remove(); mapRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Actualizar conteos en polígonos ───────────────────────────────────
+  // ─── Pintar clases y conteos en los polígonos ───────────────────────────
   useEffect(() => {
     if (!mapRef.current || !mapReady) return;
-
-    const sourcePol = mapRef.current.getSource("colonias-reales") as maplibregl.GeoJSONSource;
-    if (sourcePol) {
-      sourcePol.setData({
-        type: "FeatureCollection",
-        features: (poligonosReales as GeoJSON.FeatureCollection).features.map((f) => {
-          const key = normalizarKey(f.properties?.nombre ?? "", f.properties?.municipio ?? "");
-          const grupo = coloniasAgrupadas.get(key);
-          return { ...f, properties: { ...f.properties, count: grupo?.count ?? 0 } };
-        }),
-      });
-    }
+    const source = mapRef.current.getSource("colonias-reales") as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+    source.setData({
+      type: "FeatureCollection",
+      features: POLIGONOS.features.map((f) => {
+        const grupo = coloniasAgrupadas.get(normalizarKey(f.properties?.nombre ?? "", f.properties?.municipio ?? ""));
+        return {
+          ...f,
+          properties: { ...f.properties, count: grupo?.count ?? 0, clase: grupo?.clase ?? -1 },
+        };
+      }),
+    });
   }, [coloniasAgrupadas, mapReady]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
-  const [throttleMsg, setThrottleMsg] = useState("");
-
   const handleOpenForm = useCallback((colonia?: string) => {
-    if (colonia) {
-      const t = checkThrottle(colonia);
-      if (!t.allowed) {
-        setThrottleMsg(`Ya reportaste ${colonia}. Espera ${t.waitMinutes} min para volver a reportar esta colonia.`);
-        setTimeout(() => setThrottleMsg(""), 4000);
-        return;
-      }
-    }
     setColoniaParaReporte(colonia ?? "");
     setFormAbierto(true);
   }, []);
 
-  const handleSubmit = useCallback(async (data: { colonia: string; municipio: string; categorias: CategoriaAgua[]; descripcion: string }) => {
-    // Rate limiting: 1 reporte por colonia cada 15 min
-    const throttle = checkThrottle(data.colonia);
-    if (!throttle.allowed) {
-      return; // bloqueado silenciosamente (el form muestra mensaje)
-    }
-
-    const payload = {
-      colonia: data.colonia,
-      municipio: data.municipio,
-      categorias: data.categorias,
-      fuente_tipo: "ciudadano_sin_verificar",
-      fuente_nombre: "Reporte ciudadano",
-      descripcion: data.descripcion,
-      fecha_reporte: new Date().toISOString().split("T")[0],
-      fecha_carga: new Date().toISOString().split("T")[0],
-      estado_moderacion: "aprobado",
-    };
-
-    // Guardar en Supabase
+  const handleSubmit = useCallback(async (data: DatosReporte): Promise<ResultadoEnvio> => {
     try {
-      await supabase.from("reportes").insert(payload);
-      setThrottle(data.colonia);
-    } catch { /* si falla Supabase, guardar local */ }
-
-    // Tambien guardar en localStorage como respaldo
-    const nuevo: Reporte = {
-      id: `local-${Date.now()}`,
-      ...payload,
-      municipio: payload.municipio as Reporte["municipio"],
-    } as Reporte;
-
-    setReportes((prev) => {
-      const updated = [...prev, nuevo];
-      const ciudadanos = updated.filter((r) => r.fuente_tipo === "ciudadano_sin_verificar");
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ciudadanos)); } catch { /* ok */ }
-      return updated;
-    });
-
-    setFormAbierto(false);
+      const res = await fetch("/api/reportes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean; mensaje?: string; publicado?: boolean; reporte?: Reporte;
+      };
+      if (!res.ok || !json.ok) {
+        return { ok: false, mensaje: json.mensaje || "No pudimos enviar tu reporte. Intenta más tarde." };
+      }
+      if (json.publicado && json.reporte) {
+        const nuevo = json.reporte;
+        setReportes((prev) => [...prev, nuevo]);
+      }
+      return { ok: true, mensaje: json.mensaje || "Reporte recibido. Gracias." };
+    } catch {
+      return { ok: false, mensaje: "Sin conexión. Revisa tu internet e intenta de nuevo." };
+    }
   }, []);
 
   const handleSearchSelect = useCallback((nombre: string, municipio: string) => {
     if (!mapRef.current) return;
     const key = normalizarKey(nombre, municipio);
-    const grupo = coloniasAgrupadas.get(key);
-    const feats = (poligonosReales as GeoJSON.FeatureCollection).features.filter(
-      (f) => f.properties?.nombre === nombre && f.properties?.municipio === municipio
+    const feat = POLIGONOS.features.find(
+      (f) => normalizarKey(f.properties?.nombre ?? "", f.properties?.municipio ?? "") === key
     );
-    if (feats.length > 0) {
-      const coords = (feats[0].geometry as GeoJSON.Polygon).coordinates[0][0] as [number, number];
-      mapRef.current.flyTo({ center: coords, zoom: 14, duration: 1200 });
-    }
+    const centro = feat ? centroDeGeometria(feat.geometry) : null;
+    if (centro) mapRef.current.flyTo({ center: centro, zoom: 14, duration: 1200 });
+    const grupo = coloniasAgrupadas.get(key);
     if (grupo) {
-      setColoniaSel({ nombre, municipio, reportes: grupo.reportes, categorias: Array.from(grupo.categorias) });
+      setColoniaSel({
+        nombre, municipio, reportes: grupo.reportes,
+        categorias: Array.from(grupo.categorias), nivel: nivelDe(grupo),
+      });
       setPanelAbierto(true);
     }
-  }, [coloniasAgrupadas]);
+  }, [coloniasAgrupadas, nivelDe]);
+
+  // Top 5 colonias con más reportes (respeta filtros). Solo colonias con polígono,
+  // para que al tocarlas el mapa pueda volar a ellas.
+  const nombresPoligono = useMemo(() => {
+    const m = new globalThis.Map<string, { nombre: string; municipio: string }>();
+    for (const f of POLIGONOS.features) {
+      const n = f.properties?.nombre;
+      const mu = f.properties?.municipio;
+      if (n && mu) m.set(normalizarKey(n, mu), { nombre: n, municipio: mu });
+    }
+    return m;
+  }, []);
+
+  const top5 = useMemo<ItemTop[]>(() => {
+    const items: (ItemTop & { puntaje: number })[] = [];
+    coloniasAgrupadas.forEach((g, key) => {
+      const p = nombresPoligono.get(key);
+      if (!p || g.clase < 0) return;
+      items.push({ ...p, count: g.count, color: RAMPA_SEVERIDAD[g.clase], puntaje: g.puntaje });
+    });
+    items.sort((a, b) => b.count - a.count || b.puntaje - a.puntaje || a.nombre.localeCompare(b.nombre));
+    return items.slice(0, 5).map((c) => ({ nombre: c.nombre, municipio: c.municipio, count: c.count, color: c.color }));
+  }, [coloniasAgrupadas, nombresPoligono]);
 
   const listaColonias = useMemo(() => {
     const seen = new globalThis.Set<string>();
     const res: { nombre: string; municipio: string; count: number }[] = [];
-    for (const f of (poligonosReales as GeoJSON.FeatureCollection).features) {
+    for (const f of POLIGONOS.features) {
       const n = f.properties?.nombre;
       const m = f.properties?.municipio;
       if (!n || !m) continue;
       const k = normalizarKey(n, m);
       if (seen.has(k)) continue;
       seen.add(k);
-      const g = coloniasAgrupadas.get(k);
-      res.push({ nombre: n, municipio: m, count: g?.count ?? 0 });
+      res.push({ nombre: n, municipio: m, count: coloniasAgrupadas.get(k)?.count ?? 0 });
     }
     return res.sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [coloniasAgrupadas]);
@@ -411,18 +421,23 @@ export function Map() {
         </div>
       </div>
 
-      <FilterBar filtros={filtros} onChange={setFiltros} />
-      <MapLegend />
-      <CoprisjalPanel />
+      <FilterBar filtros={filtros} onChange={setFiltros} expandido={filtrosAbierto} onToggle={toggleFiltros} />
+      <TopColonias
+        items={top5}
+        onSelect={handleSearchSelect}
+        oculto={panelAbierto}
+        filtrado={filtros.categorias.length + filtros.fuentes.length > 0}
+        abierto={top5Abierto}
+        onToggle={toggleTop5}
+      />
+      {/* Columna inferior izquierda: COPRISJAL arriba, leyenda abajo (se empujan, no se enciman) */}
+      <div className="absolute bottom-14 left-4 z-10 flex flex-col items-start gap-2 md:bottom-9">
+        <CoprisjalPanel />
+        <MapLegend rangos={rangos} />
+      </div>
 
       {/* ── Zoom + Reportar (stacked bottom-right) ── */}
-      <div className="absolute bottom-10 right-4 z-10 flex flex-col items-end gap-2 md:bottom-8 md:right-4">
-        {throttleMsg && (
-          <div className="bg-destructive/90 text-destructive-foreground text-xs px-3 py-1.5 rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2">
-            {throttleMsg}
-          </div>
-        )}
-        {/* Custom zoom controls */}
+      <div className="absolute bottom-14 right-4 z-10 flex flex-col items-end gap-2 md:bottom-8 md:right-4">
         <div className="flex flex-col rounded-lg border bg-card/95 backdrop-blur shadow-lg overflow-hidden">
           <button
             onClick={() => mapRef.current?.zoomIn()}

@@ -30,3 +30,9 @@ Thumbs.db
 .vscode/
 .idea/
 recovery-codes.txt
+
+# TypeScript incremental
+*.tsbuildinfo
+
+# Archivos por borrar
+_to_delete/

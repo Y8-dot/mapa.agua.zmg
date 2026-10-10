@@ -50,11 +50,11 @@ const SLIDES = [
     body: (
       <div className="space-y-2">
         <p>
-          Cada punto en el mapa representa una colonia con al menos un reporte.
-          El color indica la severidad:{" "}
-          <span className="text-green-400">amarillo</span> = 1 reporte,{" "}
-          <span className="text-orange-400">naranja</span> = 2,{" "}
-          <span className="text-red-400">rojo</span> = 3+.
+          Cada colonia sombreada tiene al menos un reporte. El color compara
+          colonias entre sí: de{" "}
+          <span className="text-yellow-300">amarillo</span> (menos reportes),
+          pasando por <span className="text-orange-400">naranja</span>, a{" "}
+          <span className="text-red-500">rojo</span> (más). Los reportes recientes y de fuentes oficiales pesan más.
         </p>
         <p>
           Puedes filtrar por tipo de problema (metales, bacterias, color, olor,
@@ -95,7 +95,9 @@ const SLIDES = [
         <p>
           Si tu colonia tiene problemas de agua, repórtalo con el botón{" "}
           <strong>&quot;Reportar un problema&quot;</strong>. Tu reporte es
-          anónimo y será revisado antes de publicarse.
+          anónimo y aparece como &quot;ciudadano sin verificar&quot;. Para
+          evitar abusos, se acepta un reporte por colonia desde la misma red
+          cada 30 días.
         </p>
         <p>
           Para recomendaciones de salud, consulta a la{" "}
@@ -149,7 +151,8 @@ export function LegalDisclaimer() {
   const isLast = step === TOTAL_SLIDES - 1;
 
   return (
-    <Dialog open={open} onOpenChange={() => accept()}>
+    // Clic fuera no acepta el aviso: solo "Entendido" guarda la cookie.
+    <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="max-w-md">
         <div className="flex flex-col items-center text-center space-y-4 py-4">
           {/* Icono */}

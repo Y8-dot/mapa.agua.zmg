@@ -1,10 +1,20 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { ExternalLink, AlertTriangle, X, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import type { Reporte, CategoriaAgua } from "@/lib/tipos";
 import { CATEGORIA_LABELS, FUENTE_LABELS, CATEGORIA_COLORS } from "@/lib/tipos";
+import { fechaDeReporte } from "@/lib/severidad";
+
+export interface NivelColonia {
+  etiqueta: string;
+  color: string;
+  puntaje: number;
+}
+
+const POR_PAGINA = 20;
 
 interface ColoniaDetailProps {
   open: boolean;
@@ -14,11 +24,17 @@ interface ColoniaDetailProps {
     municipio: string;
     reportes: Reporte[];
     categorias: CategoriaAgua[];
+    nivel?: NivelColonia;
   } | null;
   onReportar: (nombre: string) => void;
 }
 
 function ColoniaDetailContent({ colonia, onClose, onReportar }: Omit<ColoniaDetailProps, "open"> & { colonia: NonNullable<ColoniaDetailProps["colonia"]> }) {
+  const [visibles, setVisibles] = useState(POR_PAGINA);
+  const ordenados = useMemo(
+    () => [...colonia.reportes].sort((a, b) => (fechaDeReporte(b) ?? 0) - (fechaDeReporte(a) ?? 0)),
+    [colonia.reportes]
+  );
   return (
     <>
       {/* Header */}
@@ -29,6 +45,7 @@ function ColoniaDetailContent({ colonia, onClose, onReportar }: Omit<ColoniaDeta
         </div>
         <button
           onClick={onClose}
+          aria-label="Cerrar"
           className="rounded-sm opacity-70 hover:opacity-100 transition-opacity"
         >
           <X className="h-5 w-5" />
@@ -43,6 +60,15 @@ function ColoniaDetailContent({ colonia, onClose, onReportar }: Omit<ColoniaDeta
             {colonia.reportes.length}{" "}
             {colonia.reportes.length === 1 ? "reporte" : "reportes"}
           </span>
+          {colonia.nivel && (
+            <span
+              className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+              title={`Puntaje ponderado: ${colonia.nivel.puntaje.toFixed(1)} (los reportes recientes y de fuentes oficiales pesan más)`}
+            >
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: colonia.nivel.color }} />
+              Nivel {colonia.nivel.etiqueta.toLowerCase()}
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap gap-1">
           {colonia.categorias.map((cat) => (
@@ -66,7 +92,7 @@ function ColoniaDetailContent({ colonia, onClose, onReportar }: Omit<ColoniaDeta
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Historial de reportes
         </h3>
-        {colonia.reportes.map((r) => (
+        {ordenados.slice(0, visibles).map((r) => (
           <div
             key={r.id}
             className="rounded-md border bg-background/50 p-3 space-y-1.5"
@@ -114,6 +140,11 @@ function ColoniaDetailContent({ colonia, onClose, onReportar }: Omit<ColoniaDeta
             </div>
           </div>
         ))}
+        {ordenados.length > visibles && (
+          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setVisibles((v) => v + POR_PAGINA)}>
+            Mostrar {Math.min(POR_PAGINA, ordenados.length - visibles)} más ({ordenados.length - visibles} restantes)
+          </Button>
+        )}
       </div>
 
       {/* Botón reportar en esta colonia */}
@@ -144,7 +175,7 @@ export function ColoniaDetail({
     <>
       {/* ── Desktop: floating panel (md+) ── */}
       <div className="hidden md:block absolute top-4 right-4 z-10 w-[360px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-lg border bg-card/95 backdrop-blur shadow-xl animate-slide-up">
-        <ColoniaDetailContent colonia={colonia} onClose={onClose} onReportar={onReportar} />
+        <ColoniaDetailContent key={`${colonia.nombre}|${colonia.municipio}`} colonia={colonia} onClose={onClose} onReportar={onReportar} />
       </div>
 
       {/* ── Mobile: bottom sheet ── */}
@@ -155,7 +186,7 @@ export function ColoniaDetail({
           <div className="sticky top-0 z-10 bg-card rounded-t-xl pt-3 pb-1 flex justify-center">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
           </div>
-          <ColoniaDetailContent colonia={colonia} onClose={onClose} onReportar={onReportar} />
+          <ColoniaDetailContent key={`${colonia.nombre}|${colonia.municipio}`} colonia={colonia} onClose={onClose} onReportar={onReportar} />
         </div>
       </div>
     </>

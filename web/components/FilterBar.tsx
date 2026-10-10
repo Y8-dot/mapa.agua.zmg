@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Filter, X, ChevronDown, ChevronUp } from "lucide-react";
 import type { CategoriaAgua, FuenteTipo } from "@/lib/tipos";
-import { CATEGORIA_LABELS, FUENTE_LABELS } from "@/lib/tipos";
+import { CATEGORIA_LABELS, FUENTE_LABELS, TODAS_CATEGORIAS, TODAS_FUENTES } from "@/lib/tipos";
 import { useState } from "react";
 
 export interface FiltrosActivos {
@@ -17,29 +17,11 @@ export interface FiltrosActivos {
 interface FilterBarProps {
   filtros: FiltrosActivos;
   onChange: (filtros: FiltrosActivos) => void;
+  expandido: boolean;
+  onToggle: () => void;
 }
 
-const TODAS_CATEGORIAS: CategoriaAgua[] = [
-  "fecal_bacteriologico",
-  "metales_pesados",
-  "sarro",
-  "color_anormal",
-  "olor",
-  "sedimentos",
-  "desabasto",
-  "otro",
-];
-
-const TODAS_FUENTES: FuenteTipo[] = [
-  "oficial",
-  "academico_ong",
-  "prensa",
-  "ciudadano_verificado",
-  "ciudadano_sin_verificar",
-];
-
-export function FilterBar({ filtros, onChange }: FilterBarProps) {
-  const [expandido, setExpandido] = useState(false);
+export function FilterBar({ filtros, onChange, expandido, onToggle }: FilterBarProps) {
   const [seccion, setSeccion] = useState<"categorias" | "fuentes">("categorias");
 
   const toggleCategoria = useCallback(
@@ -69,10 +51,11 @@ export function FilterBar({ filtros, onChange }: FilterBarProps) {
   const totalFiltros = filtros.categorias.length + filtros.fuentes.length;
 
   return (
-    <div className="absolute top-14 left-4 z-10 max-w-[340px] md:top-4">
+    <div className="absolute top-14 left-4 z-20 max-w-[340px] md:top-4">
       {/* Botón principal */}
       <button
-        onClick={() => setExpandido(!expandido)}
+        onClick={onToggle}
+        aria-expanded={expandido}
         className="flex items-center gap-2 rounded-lg border bg-card/95 backdrop-blur px-3 py-2 text-sm font-medium shadow-lg hover:bg-accent transition-colors"
       >
         <Filter className="h-4 w-4" />

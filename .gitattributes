@@ -1,0 +1,7 @@
+# Normaliza finales de linea: el repo guarda LF; en Windows se puede trabajar con CRLF
+# sin que git marque todos los archivos como modificados.
+* text=auto
+*.png binary
+*.jpg binary
+*.pdf binary
+*.xlsx binary

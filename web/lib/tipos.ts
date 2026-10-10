@@ -41,6 +41,56 @@ export interface Reporte {
   foto_url?: string;
   estado_moderacion?: "pendiente" | "aprobado" | "rechazado";
   nivel_confianza?: "alta" | "media" | "baja";
+  created_at?: string;
+}
+
+export const TODAS_CATEGORIAS: CategoriaAgua[] = [
+  "fecal_bacteriologico",
+  "metales_pesados",
+  "sarro",
+  "color_anormal",
+  "olor",
+  "sedimentos",
+  "desabasto",
+  "otro",
+];
+
+export const TODAS_FUENTES: FuenteTipo[] = [
+  "oficial",
+  "academico_ong",
+  "prensa",
+  "ciudadano_verificado",
+  "ciudadano_sin_verificar",
+];
+
+export const MUNICIPIOS_ZMG: MunicipioZMG[] = [
+  "Guadalajara",
+  "Zapopan",
+  "Tlaquepaque",
+  "Tonalá",
+  "El Salto",
+  "Tlajomulco",
+];
+
+/** Quita acentos, espacios extra y mayúsculas para comparar nombres. */
+export function normalizarTexto(s: string): string {
+  return (s ?? "")
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+/** Clave única colonia+municipio, insensible a acentos y mayúsculas. */
+export function normalizarKey(colonia: string, municipio: string): string {
+  return `${normalizarTexto(colonia)}|${normalizarTexto(municipio)}`;
+}
+
+/** Devuelve el municipio con su escritura oficial ("Tonala" → "Tonalá"), o null. */
+export function normalizarMunicipio(m: string): MunicipioZMG | null {
+  const n = normalizarTexto(m);
+  return MUNICIPIOS_ZMG.find((x) => normalizarTexto(x) === n) ?? null;
 }
 
 /** Etiquetas para categorías */
@@ -75,24 +125,3 @@ export const FUENTE_LABELS: Record<FuenteTipo, string> = {
   ciudadano_verificado: "Ciudadano verificado",
   ciudadano_sin_verificar: "Ciudadano sin verificar",
 };
-
-/** Color de severidad basado en número de reportes (0-5+) */
-export function severidadColor(count: number): string {
-  if (count === 0) return "#64748b";
-  if (count === 1) return "#eab308";
-  if (count === 2) return "#f97316";
-  if (count === 3) return "#ea580c";
-  return "#dc2626";
-}
-
-/** Color de severidad basado en categoría más grave */
-export function severidadPorCategoria(cats: CategoriaAgua[]): string {
-  if (cats.includes("fecal_bacteriologico")) return "#dc2626";
-  if (cats.includes("metales_pesados")) return "#f97316";
-  if (cats.includes("desabasto")) return "#8b5cf6";
-  if (cats.includes("sedimentos")) return "#06b6d4";
-  if (cats.includes("color_anormal")) return "#a855f7";
-  if (cats.includes("olor")) return "#6366f1";
-  if (cats.includes("sarro")) return "#eab308";
-  return "#64748b";
-}

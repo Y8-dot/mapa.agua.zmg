@@ -33,10 +33,14 @@ export default function MetodologiaPage() {
           </h3>
           <p>
             Cualquier persona puede enviar un reporte anónimo a través del
-            formulario del sitio. Los reportes ciudadanos pasan por una cola de
-            moderación antes de aparecer en el mapa público, y se etiquetan como
-            &quot;ciudadano verificado&quot; o &quot;ciudadano sin
-            verificar&quot; según corresponda.
+            formulario del sitio. Los reportes se publican al momento con la
+            etiqueta &quot;ciudadano sin verificar&quot;, y pesan menos que los
+            datos oficiales o académicos. Como no hay un equipo de moderación,
+            se acepta un reporte por colonia desde la misma red (IP) cada 30
+            días, con un máximo de 3 reportes al día por red. No guardamos la
+            IP: solo una huella cifrada (hash) que no permite recuperarla.
+            Los reportes de colonias que no están en el catálogo oficial se
+            guardan, pero no se muestran en el mapa.
           </p>
 
           <h3 className="text-lg font-medium text-foreground mt-6">
@@ -77,11 +81,15 @@ export default function MetodologiaPage() {
             ¿Cómo se presenta la severidad?
           </h2>
           <p>
-            Cada colonia se colorea según el número de reportes acumulados (1 =
-            amarillo, 2 = naranja, 3+ = rojo). Los reportes más antiguos de 6
-            meses pesan menos en el color mostrado, para reflejar la actualidad
-            del problema. Un sello de &quot;Actualizado por última vez&quot;
-            indica la fecha del dato más reciente.
+            Cada colonia recibe un puntaje: la suma de sus reportes, donde cada
+            reporte pesa según su fuente (oficial y académico/ONG: 1; prensa:
+            0.8; ciudadano sin verificar: 0.5) y su antigüedad (pierde la mitad
+            de su peso cada 6 meses). Las colonias con reportes se dividen en 5
+            niveles, de amarillo a naranja y rojo, buscando los saltos
+            naturales entre puntajes en escala logarítmica (así, pasar de 1 a 2
+            reportes cuenta tanto como pasar de 10 a 20). Por eso el color es relativo: compara colonias entre sí
+            y se recalcula con los filtros activos y conforme llegan nuevos
+            reportes. Cada reporte muestra su fecha en el panel de la colonia.
           </p>
 
           <h2 className="text-xl font-semibold text-foreground mt-8">
@@ -89,14 +97,13 @@ export default function MetodologiaPage() {
           </h2>
           <ul className="list-disc pl-6 space-y-2">
             <li>
-              Los datos iniciales son una muestra semilla (~27 colonias
-              identificadas en fuentes públicas). No cubren todas las colonias
-              con reportes (se estiman ~200-390).
+              Los datos de fuentes públicas (prensa, ONG, oficiales) cubren
+              solo las colonias mencionadas en ellas, y la mayoría de los
+              reportes son ciudadanos sin verificar.
             </li>
             <li>
-              Las coordenadas de las colonias son aproximadas (centroides). Se
-              recomienda integrar geometrías oficiales del IIEG/INEGI para
-              polígonos precisos.
+              Los polígonos de colonias provienen del catálogo de colonias del
+              IIEG (INE 2024) y están simplificados para el mapa.
             </li>
             <li>
               La ausencia de reportes en una colonia no significa ausencia de
@@ -104,7 +111,8 @@ export default function MetodologiaPage() {
             </li>
             <li>
               Este sitio no realiza análisis de laboratorio ni verifica la
-              veracidad de reportes ciudadanos más allá de la moderación básica.
+              veracidad de los reportes ciudadanos; el límite por red solo
+              reduce el abuso, no lo elimina (por ejemplo, con VPN).
             </li>
           </ul>
         </div>

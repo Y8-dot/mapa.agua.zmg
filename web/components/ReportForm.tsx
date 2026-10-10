@@ -5,22 +5,29 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { Send, Check, AlertCircle, Search, X, MapPin } from "lucide-react";
+import { Send, Check, AlertCircle, Search, X, MapPin, Loader2 } from "lucide-react";
 import type { CategoriaAgua } from "@/lib/tipos";
-import { CATEGORIA_LABELS, CATEGORIA_COLORS } from "@/lib/tipos";
+import { CATEGORIA_LABELS, CATEGORIA_COLORS, MUNICIPIOS_ZMG, TODAS_CATEGORIAS, normalizarTexto } from "@/lib/tipos";
 import coloniasCatalogo from "@/data/colonias_zmg_nombres.json";
 
 interface ColoniaItem { nombre: string; municipio: string; }
 
+export interface DatosReporte {
+  colonia: string;
+  municipio: string;
+  categorias: CategoriaAgua[];
+  descripcion: string;
+}
+
+export interface ResultadoEnvio { ok: boolean; mensaje: string; }
+
 interface ReportFormProps {
   open: boolean; onClose: () => void;
-  onSubmit: (data: { colonia: string; municipio: string; categorias: CategoriaAgua[]; descripcion: string }) => void;
+  onSubmit: (data: DatosReporte) => Promise<ResultadoEnvio>;
   coloniaInicial?: string;
 }
 
-const TODAS_CATEGORIAS: CategoriaAgua[] = [
-  "fecal_bacteriologico", "metales_pesados", "sarro", "color_anormal", "olor", "sedimentos", "desabasto", "otro",
-];
+const CATALOGO = coloniasCatalogo as ColoniaItem[];
 
 export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: ReportFormProps) {
   const [query, setQuery] = useState(coloniaInicial);
@@ -31,20 +38,31 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
   const [municipioManual, setMunicipioManual] = useState("");
   const [categorias, setCategorias] = useState<CategoriaAgua[]>([]);
   const [descripcion, setDescripcion] = useState("");
-  const [enviado, setEnviado] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState<string | null>(null);
   const [error, setError] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
   const results: ColoniaItem[] = query.trim().length >= 2 && !modoManual
-    ? (coloniasCatalogo as ColoniaItem[]).filter((c) => c.nombre.toLowerCase().includes(query.toLowerCase())).slice(0, 8)
+    ? CATALOGO.filter((c) => normalizarTexto(c.nombre).includes(normalizarTexto(query))).slice(0, 8)
     : [];
 
+  // Al abrir: precargar la colonia de la que viene el usuario (si es única en el catálogo)
+  useEffect(() => {
+    if (!open) return;
+    setQuery(coloniaInicial);
+    const n = normalizarTexto(coloniaInicial);
+    const coincidencias = n ? CATALOGO.filter((c) => normalizarTexto(c.nombre) === n) : [];
+    setSelected(coincidencias.length === 1 ? coincidencias[0] : null);
+    setShowDropdown(coincidencias.length > 1);
+  }, [open, coloniaInicial]);
+
   const reset = useCallback(() => {
-    setQuery(coloniaInicial); setSelected(null); setShowDropdown(false);
+    setQuery(""); setSelected(null); setShowDropdown(false);
     setModoManual(false); setColoniaManual(""); setMunicipioManual("");
-    setCategorias([]); setDescripcion(""); setEnviado(false); setError("");
+    setCategorias([]); setDescripcion(""); setEnviado(null); setError(""); setEnviando(false);
     onClose();
-  }, [onClose, coloniaInicial]);
+  }, [onClose]);
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (containerRef.current && !containerRef.current.contains(e.target as Node)) setShowDropdown(false); };
@@ -54,20 +72,22 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
 
   const toggleCat = (cat: CategoriaAgua) => setCategorias((p) => p.includes(cat) ? p.filter((c) => c !== cat) : [...p, cat]);
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault(); setError("");
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (enviando) return;
+    setError("");
     const colonia = modoManual ? coloniaManual.trim() : selected?.nombre ?? "";
     const municipio = modoManual ? municipioManual : selected?.municipio ?? "";
-    if (!colonia) { setError("Selecciona o escribe el nombre de la colonia."); return; }
-    if (modoManual && !municipio) { setError("Selecciona el municipio."); return; }
+    if (!colonia) { setError("Selecciona tu colonia de la lista o escríbela manualmente."); return; }
+    if (!municipio) { setError("Selecciona el municipio."); return; }
     if (categorias.length === 0) { setError("Selecciona al menos un tipo de problema."); return; }
-    onSubmit({
-      colonia, municipio: municipio || "Guadalajara", categorias,
-      descripcion: modoManual ? `[COLONIA NO VERIFICADA - requiere revision. Municipio: ${municipioManual}] ${descripcion}` : descripcion,
-    });
-    setEnviado(true);
-    setTimeout(() => reset(), 2500);
-  }, [modoManual, coloniaManual, municipioManual, selected, categorias, descripcion, onSubmit, reset]);
+    setEnviando(true);
+    const r = await onSubmit({ colonia, municipio, categorias, descripcion: descripcion.trim() });
+    setEnviando(false);
+    if (!r.ok) { setError(r.mensaje); return; }
+    setEnviado(r.mensaje);
+    setTimeout(() => reset(), 4000);
+  }, [enviando, modoManual, coloniaManual, municipioManual, selected, categorias, descripcion, onSubmit, reset]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && reset()}>
@@ -76,13 +96,16 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
           <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
             <div className="rounded-full bg-green-500/20 p-3"><Check className="h-8 w-8 text-green-400" /></div>
             <DialogTitle>Reporte enviado</DialogTitle>
-            <DialogDescription>Tu reporte ha sido recibido y quedara en revision. Aparecera en el mapa una vez aprobado.</DialogDescription>
+            <DialogDescription>{enviado}</DialogDescription>
           </div>
         ) : (
           <>
             <DialogHeader>
               <DialogTitle>Reportar un problema de agua</DialogTitle>
-              <DialogDescription>Reporte anonimo. Sera revisado antes de publicarse.</DialogDescription>
+              <DialogDescription>
+                Reporte anónimo. Se publica al momento como &quot;ciudadano sin verificar&quot;.
+                Para evitar abusos se acepta un reporte por colonia desde la misma red cada 30 días.
+              </DialogDescription>
             </DialogHeader>
             <DialogClose onClick={reset} />
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -115,7 +138,7 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
                     )}
                     {showDropdown && query.trim().length >= 2 && results.length === 0 && (
                       <div className="absolute z-30 mt-1 w-full rounded-md border bg-popover shadow-xl p-3 animate-fade-in">
-                        <p className="text-sm text-muted-foreground mb-2">No se encontro &quot;{query}&quot; en el catalogo oficial (2,053 colonias).</p>
+                        <p className="text-sm text-muted-foreground mb-2">No se encontró &quot;{query}&quot; en el catálogo oficial (2,053 colonias).</p>
                         <Button type="button" variant="outline" size="sm" className="w-full text-xs" onClick={() => { setModoManual(true); setShowDropdown(false); }}>
                           Escribir nombre manualmente
                         </Button>
@@ -136,9 +159,9 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
                     <select value={municipioManual} onChange={(e) => setMunicipioManual(e.target.value)}
                       className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" required>
                       <option value="">Selecciona el municipio</option>
-                      {["Guadalajara","Zapopan","Tlaquepaque","Tonala","El Salto","Tlajomulco"].map((m) => <option key={m} value={m}>{m}</option>)}
+                      {MUNICIPIOS_ZMG.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
-                    <p className="text-xs text-amber-400 flex items-center gap-1"><AlertCircle className="h-3 w-3" />Esta colonia no esta en el catalogo oficial. Un moderador la verificara antes de publicarla.</p>
+                    <p className="text-xs text-amber-400 flex items-center gap-1"><AlertCircle className="h-3 w-3" />Esta colonia no está en el catálogo oficial: tu reporte se guardará, pero no aparecerá en el mapa por ahora.</p>
                   </div>
                 )}
               </div>
@@ -161,9 +184,9 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
               </div>
 
               <div>
-                <label className="text-sm font-medium">Descripcion (opcional)</label>
+                <label className="text-sm font-medium">Descripción (opcional)</label>
                 <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
-                  placeholder="Describe el problema: color, olor, particulas, desde cuando..." rows={3}
+                  placeholder="Describe el problema: color, olor, partículas, desde cuándo..." rows={3} maxLength={1000}
                   className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
               </div>
 
@@ -173,8 +196,11 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
                 </div>
               )}
 
-              <Button type="submit" className="w-full gap-2"><Send className="h-4 w-4" />Enviar reporte</Button>
-              <p className="text-xs text-muted-foreground text-center">* Campos requeridos. Reporte anonimo.</p>
+              <Button type="submit" className="w-full gap-2" disabled={enviando}>
+                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {enviando ? "Enviando…" : "Enviar reporte"}
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">* Campos requeridos. No guardamos tu IP, solo una huella cifrada para limitar abusos.</p>
             </form>
           </>
         )}
