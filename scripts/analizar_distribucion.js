@@ -1,10 +1,14 @@
 // Analiza la distribución de reportes por colonia para diseñar la escala de colores.
-// Uso: node scripts/analizar_distribucion.js
+// Uso: SUPABASE_URL=... SUPABASE_KEY=... node scripts/analizar_distribucion.js
 const https = require("https");
 const path = require("path");
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://awukzgnyceaeybixnqmy.supabase.co";
-const SUPABASE_KEY = process.env.SUPABASE_KEY || "sb_publishable_PkwrqqKt7z8WxpAadJXNKQ_5RRvGq7L";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error("Define SUPABASE_URL y SUPABASE_KEY (clave publishable) como variables de entorno.");
+  process.exit(1);
+}
 
 const polis = require(path.join(__dirname, "..", "web", "data", "colonias_zmg_poligonos.json"));
 
