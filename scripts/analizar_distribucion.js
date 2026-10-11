@@ -6,7 +6,7 @@ const path = require("path");
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("Define SUPABASE_URL y SUPABASE_KEY (clave publishable) como variables de entorno.");
+  console.error("Define SUPABASE_URL y SUPABASE_KEY (clave secreta sb_secret_…; la publishable ya no puede leer la tabla) como variables de entorno.");
   process.exit(1);
 }
 

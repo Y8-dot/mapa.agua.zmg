@@ -29,6 +29,16 @@ const VENTANA_COLONIA_DIAS = 30;
 const MAX_POR_DIA = 3;
 const MAX_DESCRIPCION = 1000;
 
+/**
+ * Freno global: si en los últimos VENTANA_GLOBAL_MIN minutos llegaron más de
+ * UMBRAL_GLOBAL envíos (de todas las redes juntas), los nuevos se guardan como
+ * "pendiente" y no se publican. Protege contra ataques distribuidos (muchas IPs)
+ * que el límite por red no detiene. Para publicarlos después:
+ *   update reportes set estado_moderacion = 'aprobado' where id in (...);
+ */
+const VENTANA_GLOBAL_MIN = 10;
+const UMBRAL_GLOBAL = 150;
+
 type ItemCatalogo = { nombre: string; municipio: string };
 const CATALOGO = new Map<string, ItemCatalogo>(
   (catalogo as ItemCatalogo[]).map((c) => [normalizarKey(c.nombre, c.municipio), c])
@@ -60,6 +70,29 @@ function agruparIp(ip: string): string {
 
 function hashIp(ip: string, salt: string): string {
   return createHash("sha256").update(`${salt}:${agruparIp(ip)}`).digest("hex");
+}
+
+/**
+ * Cloudflare Turnstile (opcional). Solo se exige si existe TURNSTILE_SECRET_KEY.
+ * Devuelve null si el token es válido, o el motivo del rechazo.
+ */
+async function verificarTurnstile(token: string, ip: string, secret: string): Promise<string | null> {
+  if (!token) return "Completa la verificación anti-bots antes de enviar.";
+  try {
+    const form = new URLSearchParams({ secret, response: token, remoteip: ip });
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(5000),
+    });
+    const json = (await res.json()) as { success?: boolean; "error-codes"?: string[] };
+    if (json.success) return null;
+    console.warn("[api/reportes] Turnstile rechazó el token:", json["error-codes"]);
+    return "No pudimos verificar que eres una persona. Recarga la página e intenta de nuevo.";
+  } catch (e) {
+    console.error("[api/reportes] Error verificando Turnstile:", e);
+    return "No pudimos verificar tu envío en este momento. Intenta en unos minutos.";
+  }
 }
 
 function hoyEnGuadalajara(): string {
@@ -104,16 +137,25 @@ export async function POST(req: NextRequest) {
   const enCatalogo = CATALOGO.get(coloniaKey);
   // Colonias fuera del catálogo se guardan pero no se publican (no tienen polígono).
   const colonia = enCatalogo?.nombre ?? coloniaTexto;
-  const estado = enCatalogo ? "aprobado" : "pendiente";
+  let estado: "aprobado" | "pendiente" = enCatalogo ? "aprobado" : "pendiente";
 
-  // ── Límite por red ───────────────────────────────────────────────────
   const ip = obtenerIp(req);
   if (!ip) return responder(400, "No se pudo identificar tu conexión.");
+
+  // ── Verificación anti-bots (solo si está configurada) ───────────────
+  const secretoTurnstile = process.env.TURNSTILE_SECRET_KEY;
+  if (secretoTurnstile) {
+    const motivo = await verificarTurnstile(limpiarTexto(body.turnstile, 4096), ip, secretoTurnstile);
+    if (motivo) return responder(403, motivo);
+  }
+
+  // ── Límite por red ───────────────────────────────────────────────────
   const ipHash = hashIp(ip, claves.salt);
 
   const ahora = Date.now();
   const hace24h = new Date(ahora - 86_400_000).toISOString();
   const haceVentana = new Date(ahora - VENTANA_COLONIA_DIAS * 86_400_000).toISOString();
+  const haceGlobal = new Date(ahora - VENTANA_GLOBAL_MIN * 60_000).toISOString();
 
   // Primero se RESERVA el envío y luego se cuenta (incluyéndolo). Así, si un
   // script manda muchas solicitudes en paralelo, todas ven las reservas de las
@@ -129,11 +171,13 @@ export async function POST(req: NextRequest) {
   }
   const liberar = () => db.from("reportes_envios").delete().eq("id", reserva.id);
 
-  const [dia, mismaColonia] = await Promise.all([
+  const [dia, mismaColonia, global] = await Promise.all([
     db.from("reportes_envios").select("id", { count: "exact", head: true })
       .eq("ip_hash", ipHash).gte("created_at", hace24h),
     db.from("reportes_envios").select("id", { count: "exact", head: true })
       .eq("ip_hash", ipHash).eq("colonia_key", coloniaKey).gte("created_at", haceVentana),
+    db.from("reportes_envios").select("id", { count: "exact", head: true })
+      .gte("created_at", haceGlobal),
   ]);
   if (dia.error || mismaColonia.error) {
     console.error("[api/reportes] Error consultando límites:", dia.error ?? mismaColonia.error);
@@ -147,6 +191,13 @@ export async function POST(req: NextRequest) {
   if ((dia.count ?? 0) > MAX_POR_DIA) {
     await liberar();
     return responder(429, `Desde tu red ya se enviaron ${MAX_POR_DIA} reportes hoy. Intenta mañana.`);
+  }
+
+  // Freno global: ante una avalancha, se guarda pero no se publica.
+  const frenado = estado === "aprobado" && !global.error && (global.count ?? 0) > UMBRAL_GLOBAL;
+  if (frenado) {
+    estado = "pendiente";
+    console.warn(`[api/reportes] Freno global activo: ${global.count} envíos en ${VENTANA_GLOBAL_MIN} min`);
   }
 
   // ── Inserción ────────────────────────────────────────────────────────
@@ -176,11 +227,11 @@ export async function POST(req: NextRequest) {
   await db.from("reportes_envios").update({ reporte_id: fila.id }).eq("id", reserva.id);
 
   const reporte: Reporte = { ...fila, id: String(fila.id) } as Reporte;
-  return responder(
-    201,
-    enCatalogo
-      ? "Tu reporte ya aparece en el mapa. Gracias."
-      : "Recibimos tu reporte. Como tu colonia no está en el catálogo oficial, se guardará pero no aparecerá en el mapa por ahora.",
-    { publicado: !!enCatalogo, reporte }
-  );
+  const publicado = estado === "aprobado";
+  const mensaje = publicado
+    ? "Tu reporte ya aparece en el mapa. Gracias."
+    : frenado
+      ? "Recibimos tu reporte. En este momento llegan demasiados reportes a la vez, así que por seguridad quedó guardado pero no aparecerá en el mapa hasta que se revise."
+      : "Recibimos tu reporte. Como tu colonia no está en el catálogo oficial, se guardará pero no aparecerá en el mapa por ahora.";
+  return responder(201, mensaje, { publicado, reporte });
 }

@@ -39,6 +39,9 @@ export default function MetodologiaPage() {
             se acepta un reporte por colonia desde la misma red (IP) cada 30
             días, con un máximo de 3 reportes al día por red. No guardamos la
             IP: solo una huella cifrada (hash) que no permite recuperarla.
+            Si en 10 minutos llegan más de 150 reportes de todas las redes
+            juntas (señal de un ataque), los nuevos se guardan pero no se
+            publican hasta revisarlos.
             Los reportes de colonias que no están en el catálogo oficial se
             guardan, pero no se muestran en el mapa.
           </p>

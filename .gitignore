@@ -36,3 +36,6 @@ recovery-codes.txt
 
 # Archivos por borrar
 _to_delete/
+
+# Evidencia de incidentes (logs con IPs): no subir al repo
+evidencia/

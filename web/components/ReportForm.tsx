@@ -9,6 +9,7 @@ import { Send, Check, AlertCircle, Search, X, MapPin, Loader2 } from "lucide-rea
 import type { CategoriaAgua } from "@/lib/tipos";
 import { CATEGORIA_LABELS, CATEGORIA_COLORS, MUNICIPIOS_ZMG, TODAS_CATEGORIAS, normalizarTexto } from "@/lib/tipos";
 import coloniasCatalogo from "@/data/colonias_zmg_nombres.json";
+import { Turnstile, TURNSTILE_SITE_KEY } from "./Turnstile";
 
 interface ColoniaItem { nombre: string; municipio: string; }
 
@@ -17,6 +18,8 @@ export interface DatosReporte {
   municipio: string;
   categorias: CategoriaAgua[];
   descripcion: string;
+  /** Token de Cloudflare Turnstile (solo si está configurado). */
+  turnstile?: string;
 }
 
 export interface ResultadoEnvio { ok: boolean; mensaje: string; }
@@ -41,6 +44,8 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [tokenTs, setTokenTs] = useState("");
+  const [tsKey, setTsKey] = useState(0); // cambiarla vuelve a montar el widget (token nuevo)
   const containerRef = useRef<HTMLDivElement>(null);
 
   const results: ColoniaItem[] = query.trim().length >= 2 && !modoManual
@@ -61,6 +66,7 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
     setQuery(""); setSelected(null); setShowDropdown(false);
     setModoManual(false); setColoniaManual(""); setMunicipioManual("");
     setCategorias([]); setDescripcion(""); setEnviado(null); setError(""); setEnviando(false);
+    setTokenTs(""); setTsKey((k) => k + 1);
     onClose();
   }, [onClose]);
 
@@ -81,13 +87,22 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
     if (!colonia) { setError("Selecciona tu colonia de la lista o escríbela manualmente."); return; }
     if (!municipio) { setError("Selecciona el municipio."); return; }
     if (categorias.length === 0) { setError("Selecciona al menos un tipo de problema."); return; }
+    if (TURNSTILE_SITE_KEY && !tokenTs) { setError("Espera a que termine la verificación anti-bots."); return; }
     setEnviando(true);
-    const r = await onSubmit({ colonia, municipio, categorias, descripcion: descripcion.trim() });
+    const r = await onSubmit({
+      colonia, municipio, categorias, descripcion: descripcion.trim(),
+      ...(TURNSTILE_SITE_KEY ? { turnstile: tokenTs } : {}),
+    });
     setEnviando(false);
-    if (!r.ok) { setError(r.mensaje); return; }
+    if (!r.ok) {
+      setError(r.mensaje);
+      // El token ya se usó: pedir uno nuevo para el siguiente intento.
+      if (TURNSTILE_SITE_KEY) { setTokenTs(""); setTsKey((k) => k + 1); }
+      return;
+    }
     setEnviado(r.mensaje);
     setTimeout(() => reset(), 4000);
-  }, [enviando, modoManual, coloniaManual, municipioManual, selected, categorias, descripcion, onSubmit, reset]);
+  }, [enviando, modoManual, coloniaManual, municipioManual, selected, categorias, descripcion, tokenTs, onSubmit, reset]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && reset()}>
@@ -189,6 +204,8 @@ export function ReportForm({ open, onClose, onSubmit, coloniaInicial = "" }: Rep
                   placeholder="Describe el problema: color, olor, partículas, desde cuándo..." rows={3} maxLength={1000}
                   className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
               </div>
+
+              {open && <Turnstile key={tsKey} onToken={setTokenTs} />}
 
               {error && (
                 <div className="flex items-center gap-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive">

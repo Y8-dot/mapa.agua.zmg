@@ -14,7 +14,7 @@ import { SearchBar } from "./SearchBar";
 import { TopColonias, type ItemTop } from "./TopColonias";
 import { Button } from "./ui/button";
 import { Plus, Minus } from "lucide-react";
-import { normalizarKey, type Reporte, type CategoriaAgua, type FuenteTipo } from "@/lib/tipos";
+import { normalizarKey, type Reporte, type CategoriaAgua } from "@/lib/tipos";
 import {
   calcularCortes,
   claseDePuntaje,
@@ -24,54 +24,25 @@ import {
   OPACIDAD_SEVERIDAD,
   RAMPA_SEVERIDAD,
 } from "@/lib/severidad";
-import { supabase } from "@/lib/supabase";
 
 import poligonosReales from "@/data/colonias_zmg_poligonos.json";
 
 const POLIGONOS = poligonosReales as GeoJSON.FeatureCollection;
 
-const COLUMNAS =
-  "id,colonia,municipio,categorias,fuente_tipo,fuente_nombre,fuente_url,descripcion,fecha_reporte,fecha_carga,nivel_confianza,created_at";
-
-// ─── Cargar reportes aprobados desde Supabase ────────────────────────────
+// ─── Cargar reportes aprobados (vía /api/datos, cacheado en la CDN) ──────
 async function fetchReportes(): Promise<Reporte[]> {
-  // PostgREST limita a 1000 filas por request: paginar.
-  const PAGE_SIZE = 1000;
-  const remotos: Reporte[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from("reportes")
-      .select(COLUMNAS)
-      .eq("estado_moderacion", "aprobado")
-      .order("id", { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (error) {
-      console.error("[mapa] Error cargando reportes:", error.message);
-      break;
+  try {
+    const res = await fetch("/api/datos");
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; reportes?: Reporte[] } | null;
+    if (!res.ok || !json?.ok || !Array.isArray(json.reportes)) {
+      console.error("[mapa] Error cargando reportes:", res.status);
+      return [];
     }
-    if (!data || data.length === 0) break;
-
-    for (const r of data as Record<string, unknown>[]) {
-      remotos.push({
-        id: String(r.id),
-        colonia: r.colonia as string,
-        municipio: r.municipio as Reporte["municipio"],
-        categorias: (r.categorias as CategoriaAgua[]) || [],
-        fuente_tipo: r.fuente_tipo as FuenteTipo,
-        fuente_nombre: r.fuente_nombre as string,
-        fuente_url: (r.fuente_url as string) || undefined,
-        descripcion: (r.descripcion as string) || "",
-        fecha_reporte: r.fecha_reporte as string,
-        fecha_carga: (r.fecha_carga as string) || "",
-        nivel_confianza: r.nivel_confianza as Reporte["nivel_confianza"],
-        created_at: r.created_at as string | undefined,
-        estado_moderacion: "aprobado",
-      });
-    }
-    if (data.length < PAGE_SIZE) break;
+    return json.reportes;
+  } catch (e) {
+    console.error("[mapa] Error cargando reportes:", e);
+    return [];
   }
-  return remotos;
 }
 
 function esEscritorio(): boolean {
