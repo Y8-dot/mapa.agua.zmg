@@ -39,3 +39,6 @@ _to_delete/
 
 # Evidencia de incidentes (logs con IPs): no subir al repo
 evidencia/
+
+# Skill de auditoría de seguridad (copia local, no se versiona)
+security-audit-skill-main/
