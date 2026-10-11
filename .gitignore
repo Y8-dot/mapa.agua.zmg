@@ -42,3 +42,10 @@ evidencia/
 
 # Skill de auditoría de seguridad (copia local, no se versiona)
 security-audit-skill-main/
+
+# Más variantes de entorno y llaves (auditoría run-1)
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json

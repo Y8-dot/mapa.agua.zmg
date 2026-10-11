@@ -40,14 +40,16 @@ npm run lint
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` ya no se usa en el código.
 
-SQL de Supabase, en orden: `scripts/supabase_migration.sql` (tabla), `scripts/supabase_migration_002_limite_ip.sql` (RLS + `reportes_envios`) y `scripts/supabase_migration_003_solo_servidor.sql` (quita la lectura pública; correr solo con `/api/datos` ya en producción).
+SQL de Supabase, en orden: `scripts/supabase_migration.sql` (tabla), `scripts/supabase_migration_002_limite_ip.sql` (RLS + `reportes_envios`), `scripts/supabase_migration_003_solo_servidor.sql` (quita la lectura pública; correr solo con `/api/datos` ya en producción) y `scripts/supabase_migration_004_endurecimiento.sql` (REVOKE a anon, CHECK de `fuente_url`, índice y FK `SET NULL`).
+
+**Data Cache de Next 14:** todo `fetch` sin opciones de caché se guarda (hasta un año) aunque la ruta sea `force-dynamic`. Por eso `lib/supabase-server.ts` tiene dos clientes: `supabaseServidor()` (escrituras y conteos, `cache: "no-store"`) y `supabaseLectura()` (lecturas públicas, `revalidate: 60`). No crear clientes de Supabase en otro lado.
 
 ## Reportes ciudadanos y límite por IP
 
-No hay moderadores: los reportes de colonias del catálogo se publican al momento como `ciudadano_sin_verificar`; los de colonias fuera del catálogo se guardan como `pendiente` (no se muestran). `/api/reportes` limita a 1 reporte por colonia por red cada 30 días y 3 por red al día (IPv6 agrupada por /64). La IP no se guarda: solo `sha256(sal + ip)` en `reportes_envios`.
+No hay moderadores: los reportes de colonias del catálogo se publican al momento como `ciudadano_sin_verificar`; los de colonias fuera del catálogo se guardan como `pendiente` (no se muestran). `/api/reportes` limita a 1 reporte por colonia por red cada 30 días y 3 por red al día (IPv6 agrupada por /64). La IP sale de `x-vercel-forwarded-for` en Vercel (la plataforma descarta los encabezados de IP del cliente; fuera de Vercel se usa `x-forwarded-for`, que sí controla el cliente) y no se guarda: solo `sha256(sal + ip)` en `reportes_envios`. El POST solo acepta `Content-Type: application/json` y rechaza `Sec-Fetch-Site: cross-site`.
 
 Defensas adicionales:
-- **Freno global**: si hay más de 150 envíos (todas las redes) en 10 min, los nuevos quedan `pendiente`. Para publicarlos: `update reportes set estado_moderacion='aprobado' where id in (...)`.
+- **Freno global**: si hay más de 150 envíos (todas las redes) en 10 min, o si el conteo falla, los nuevos quedan `pendiente`. Para publicarlos: `update reportes set estado_moderacion='aprobado' where id in (...)`.
 - **Turnstile** opcional (ver variables de entorno). Si `TURNSTILE_SECRET_KEY` existe y Cloudflare no responde, el envío se rechaza (falla cerrado).
 - **Firewall de Vercel** (plan Hobby, se configura en el panel): rate limit de 10 solicitudes/min por IP a `/api/reportes` (429) y bloqueo de las huellas JA4 `t13d3112h1_e8f1e7e78f70_b26ce05bbdd6` (python-requests) y `t13d3112h2_e8f1e7e78f70_b26ce05bbdd6` (curl) usadas en el ataque del 9-oct-2026.
 
@@ -105,3 +107,7 @@ Reporte {
 1. **Moderación ligera** — si aparece alguien que pueda revisar, usar `estado_moderacion` (los datos ya lo soportan)
 2. **Normalizar por población** — falta población en ~250 colonias del shapefile
 3. **Scraper de noticias** — proceso semanal para detectar nuevas colonias en prensa
+
+## Auditoría de seguridad
+
+La skill de Cloudflare está en `security-audit-skill-main/` (copia local, ignorada por git). Corrida 1 (2026-10-10, perfil quick, commit 180f8c7): 1 hallazgo confirmado (Data Cache congelaba `/api/datos`, ya corregido), 2 por validar (encabezado de IP en Vercel; filas heredadas con `fuente_url` no http(s)), 1 rechazado (IPv6 /64). Pendiente para otra corrida: filas de `reportes` escritas con la clave anon antes de la 002.

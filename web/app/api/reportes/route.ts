@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createHash } from "crypto";
+import { isIP } from "net";
 import { supabaseServidor, clavesServidor } from "@/lib/supabase-server";
 import {
   TODAS_CATEGORIAS,
@@ -49,10 +50,19 @@ function responder(status: number, mensaje: string, extra: Record<string, unknow
 }
 
 function obtenerIp(req: NextRequest): string | null {
-  // En Vercel, x-forwarded-for lo pone la plataforma (sobrescribe el del cliente).
-  const xff = req.headers.get("x-forwarded-for");
-  const ip = xff?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || req.ip || "";
-  if (ip) return ip;
+  // En Vercel la plataforma escribe estos encabezados y descarta los del cliente
+  // (https://vercel.com/docs/headers/request-headers). Se prefiere
+  // x-vercel-forwarded-for porque sigue siendo fiable aunque haya un proxy delante.
+  // Fuera de Vercel (next start detrás de otro proxy) estos encabezados los
+  // controla el cliente: en ese caso hay que configurar el proxy para sobrescribirlos.
+  const enVercel = !!process.env.VERCEL;
+  const candidatos = enVercel
+    ? [req.headers.get("x-vercel-forwarded-for"), req.headers.get("x-real-ip"), req.headers.get("x-forwarded-for")]
+    : [req.headers.get("x-forwarded-for"), req.headers.get("x-real-ip")];
+  for (const c of candidatos) {
+    const ip = c?.split(",")[0]?.trim();
+    if (ip && isIP(ip.replace(/^::ffff:/, ""))) return ip;
+  }
   return process.env.NODE_ENV === "production" ? null : "127.0.0.1";
 }
 
@@ -102,7 +112,12 @@ function hoyEnGuadalajara(): string {
 function limpiarTexto(s: unknown, max: number): string {
   if (typeof s !== "string") return "";
   // eslint-disable-next-line no-control-regex
-  return s.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "").trim().slice(0, max);
+  return s
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "")
+    // Caracteres de formato invisibles (bidi, zero-width) que permiten falsear el texto mostrado.
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "")
+    .trim()
+    .slice(0, max);
 }
 
 export async function POST(req: NextRequest) {
@@ -113,9 +128,23 @@ export async function POST(req: NextRequest) {
     return responder(503, "Los reportes están deshabilitados temporalmente. Intenta más tarde.");
   }
 
+  // Solo JSON: bloquea los envíos "simples" (text/plain) que cualquier otra
+  // página web podría disparar desde el navegador de sus visitantes.
+  const tipo = req.headers.get("content-type") ?? "";
+  if (!tipo.toLowerCase().startsWith("application/json")) {
+    return responder(415, "Solicitud inválida.");
+  }
+  if (req.headers.get("sec-fetch-site") === "cross-site") {
+    return responder(403, "Solicitud inválida.");
+  }
+
   let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    const crudo: unknown = await req.json();
+    if (!crudo || typeof crudo !== "object" || Array.isArray(crudo)) {
+      return responder(400, "Solicitud inválida.");
+    }
+    body = crudo as Record<string, unknown>;
   } catch {
     return responder(400, "Solicitud inválida.");
   }
@@ -194,10 +223,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Freno global: ante una avalancha, se guarda pero no se publica.
-  const frenado = estado === "aprobado" && !global.error && (global.count ?? 0) > UMBRAL_GLOBAL;
+  // Si el conteo global falla, se asume avalancha (falla cerrado).
+  const frenado = estado === "aprobado" && (!!global.error || (global.count ?? 0) > UMBRAL_GLOBAL);
   if (frenado) {
     estado = "pendiente";
-    console.warn(`[api/reportes] Freno global activo: ${global.count} envíos en ${VENTANA_GLOBAL_MIN} min`);
+    if (global.error) console.error("[api/reportes] Error en conteo global; se guarda como pendiente:", global.error);
+    else console.warn(`[api/reportes] Freno global activo: ${global.count} envíos en ${VENTANA_GLOBAL_MIN} min`);
   }
 
   // ── Inserción ────────────────────────────────────────────────────────

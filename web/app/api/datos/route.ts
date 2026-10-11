@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseServidor } from "@/lib/supabase-server";
+import { supabaseLectura } from "@/lib/supabase-server";
 import type { CategoriaAgua, FuenteTipo, Reporte } from "@/lib/tipos";
 
 export const runtime = "nodejs";
@@ -13,6 +13,10 @@ export const dynamic = "force-dynamic";
  * hasta 5 min mientras se renueva). Así, miles de visitas o un bot recargando
  * la página generan como mucho ~1 consulta a Supabase por minuto, en lugar de
  * una por visita.
+ *
+ * Además, las consultas a Supabase se reutilizan como máximo 60 s en la Data
+ * Cache de Next (ver supabaseLectura): sin ese límite explícito, Next 14 las
+ * guardaba indefinidamente y el mapa no reflejaba aprobaciones ni rechazos.
  */
 const COLUMNAS =
   "id,colonia,municipio,categorias,fuente_tipo,fuente_nombre,fuente_url,descripcion,fecha_reporte,fecha_carga,nivel_confianza,created_at";
@@ -22,7 +26,7 @@ const MAX_FILAS = 50_000; // tope de seguridad
 const CACHE_OK = "public, s-maxage=60, stale-while-revalidate=300";
 
 export async function GET() {
-  const db = supabaseServidor();
+  const db = supabaseLectura();
   if (!db) {
     console.error("[api/datos] Falta SUPABASE_SECRET_KEY o NEXT_PUBLIC_SUPABASE_URL");
     return NextResponse.json(

@@ -8,6 +8,17 @@ import type { Reporte, CategoriaAgua } from "@/lib/tipos";
 import { CATEGORIA_LABELS, FUENTE_LABELS, CATEGORIA_COLORS } from "@/lib/tipos";
 import { fechaDeReporte } from "@/lib/severidad";
 
+/** Solo enlaces http(s): un `javascript:` u otro esquema guardado en la BD nunca se vuelve clicable. */
+function urlSegura(u?: string | null): string | null {
+  if (!u) return null;
+  try {
+    const url = new URL(u);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface NivelColonia {
   etiqueta: string;
   color: string;
@@ -125,9 +136,9 @@ function ColoniaDetailContent({ colonia, onClose, onReportar }: Omit<ColoniaDeta
               </Badge>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 {r.fuente_nombre && <span>{r.fuente_nombre}</span>}
-                {r.fuente_url && (
+                {urlSegura(r.fuente_url) && (
                   <a
-                    href={r.fuente_url}
+                    href={urlSegura(r.fuente_url)!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-0.5 text-primary hover:underline"
